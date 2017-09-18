@@ -1,0 +1,14 @@
+[Unit]
+Description=hmr
+After=network.target docker.service
+
+[Service]
+WorkingDirectory=/usr/local/chip-in/hmr
+ExecStart=/usr/local/nodejs/bin/npm start
+Restart=on-failure
+StartLimitBurst=0
+RestartSec=60s
+Environment="PATH=/usr/local/nodejs/bin/:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+[Install]
+WantedBy=multi-user.target
