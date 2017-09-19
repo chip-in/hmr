@@ -1,0 +1,21 @@
+sudo: required
+language: ruby
+services:
+- docker
+install: true
+script:
+- docker build -t chipin/hmr-rpm .
+- mkdir -p /tmp/RPMS/x86_64
+- sudo chown 111:111 -R /tmp/RPMS
+- docker run -it --rm --name hmr-rpm -v /tmp/RPMS:/home/builder/rpmbuild/RPMS chipin/hmr-rpm
+- "(cd /tmp;tar czf - RPMS) > $TRAVIS_BUILD_DIR/hmr-rpm.tar.gz"
+deploy:
+  provider: releases
+  api_key:
+    secure: XWLl7XRp+1kX4L1tEsqFAarUCbJgiPchebSqmr/5R76RKQuyejRT2jYK+vX3WgOfBkPGNGxyisgDVyE/QknYdJZjTWuu9TaGCd00ZtMAqj5cxcD38UQXIqXvI5koxfwKIDcVfmuUGlvs/sDNrLJuQxZpqiNN5AyDRjbBkOMf0RhBhXKhSXpFGcRndqv3NZyQnJzPEUiy22c+B3SXc7UNejchVuKAIVxPB9wyTCE32z8daPinH4rEyHQby7DIT6m6U6xe0cseXP0M6/yXExzo1vx9T6i16hDkL+M6xBXt9Nj7mDQkLgU5G2/WxsyzkxADdyHr/3NbOH6l3Y+cQoHqetGeubzXeVg4PgC1Pd6JmSm9kn4xvmB6eH7j3w09DQnd3IeLGBqaxzaxC18DV1Nprnfxn1GdDMPfWbNbqcSI3IlZq3DMEya50ywUpdDx9/NShcjEAcooAYkukqUdkkpbtoQHSH7qcVOPUr245C2q9wzSs6UFe8Lf1N0JCI9sIt3bXGgIegObEsEbG2I3wjQB9v2W0b/Iy9s2oB9DrChvT37aEglpoyx4mjuUw+LVroIDPTQEwMTTguZRTar1E2sPNFU+2Ix57cOlOfkuYNmpTE8+FzvEBIGLdsHIbGey4W3yIPhw84dROSvJQ6dG4EMtegaFK9aOgXfA9uEX0+VyZdo=
+  file: hmr-rpm.tar.gz
+  overwrite: true
+  skip_cleanup: true
+  on:
+    repo: chip-in/hmr
+    tags: true
