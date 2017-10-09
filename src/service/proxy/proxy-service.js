@@ -110,7 +110,7 @@ export default class ProxyService extends AbstractService {
 
   _convertRequestMessage(req, path) {
     var props = ["baseUrl", "body", "cookies",
-    "headers", "host", "httpVersion", "httpVersionMajor",
+    "headers", "hostname", "httpVersion", "httpVersionMajor",
     "httpVersionMinor", "ip", "ips", "method", "originalUrl",
     "params", "path", "protocol", "query", "rawHeaders", "url"];
     var reqMsg = {};
@@ -208,6 +208,9 @@ export default class ProxyService extends AbstractService {
   }
 
   _createServiceName(path) {
+    if (path[path.length - 1] !== "/") {
+      path = path + "/";
+    }
     return path === this.appProxyPathPrefix ? this.getServiceName() : this.getServiceName() + ":" + path;
   }
 
