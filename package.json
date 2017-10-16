@@ -1,6 +1,6 @@
 {
   "name": "hmr",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "chip-in HMR(HTTP Message Router) server",
   "keywords": [
     "chip-in"
