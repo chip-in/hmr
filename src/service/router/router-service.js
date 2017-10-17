@@ -1,6 +1,9 @@
 import AbstractService from '../abstract-service';
 import io from 'socket.io';
 import uuidv4 from 'uuid/v4';
+import cookie from 'cookie';
+import jwt from 'jsonwebtoken';
+import UAParser from 'ua-parser-js';
 
 export default class RouterService extends AbstractService {
   constructor(hmr) {
@@ -13,6 +16,8 @@ export default class RouterService extends AbstractService {
     this.socketMap = {};
     this.sessionTable = {};
     this.routes = {};
+    
+    this.tokenCookieValue = "access_token"
   }
 
   _startService() {
@@ -34,8 +39,11 @@ export default class RouterService extends AbstractService {
           var nodeId = uuidv4();
           this.logger.info('ResourceNode connected from %s', socket.request.socket.remoteAddress);
           this.socketMap[nodeId] = socket;
-
-          socket.on(this.webSocketMsgName, (msg)=>this._receive(nodeId, socket, msg));
+          var userInformation = this._createUserInformation(socket);
+          socket.on(this.webSocketMsgName, (msg)=> {
+            msg.u = userInformation;
+            return this._receive(nodeId, socket, msg)
+          });
           socket.on('disconnect', (reason) => this._notifyDisconnect(nodeId, socket, reason));
         });
         this.logger.info("Start Websocket (path:%s)", this.webSocketPath);
@@ -48,6 +56,7 @@ export default class RouterService extends AbstractService {
       nodeId : nodeId
     });
   }
+
   _receive(nodeId, socket, msg) {
     return Promise.resolve()
       .then(()=>{
@@ -213,5 +222,35 @@ export default class RouterService extends AbstractService {
     delete this.routes[instanceId];
     this.logger.info("Delete route for inprocess-service(instanceId:%s)", instanceId)
   }
-
+  _createUserInformation(socket) {
+    var ret = {};
+    if (socket.request == null) {
+      return ret;
+    }
+    var headers = socket.request.headers;
+    //jwt token
+    var obj = cookie.parse(headers["cookie"] || "");
+    var token = obj && obj[this.tokenCookieValue];
+    if (token != null) {
+      try {
+        var decoded = jwt.decode(token, {complete: true})
+        ret.token = decoded.payload;
+      } catch (e) {
+        this.logger.warn("Failed to parse jwt", e);
+        //IGNORE
+      }
+    }
+    //user agent
+    var ua = headers["user-agent"];
+    if (ua != null) {
+      ret.ua = UAParser(ua);
+    }
+    //TODO rule-based device detection
+    if ("node-XMLHttpRequest" === ua) {
+      ret.device = "server";
+    } else {
+      ret.device = "browser";
+    }
+    return ret;
+  }
 }
