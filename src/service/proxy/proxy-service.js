@@ -1,6 +1,7 @@
 import AbstractService from '../abstract-service';
 import uuidv4 from 'uuid/v4';
 import url from 'url';
+import DirectoryService from './directory-service';
 
 export default class ProxyService extends AbstractService {
 
@@ -8,8 +9,9 @@ export default class ProxyService extends AbstractService {
     super(hmr);
     this.appProxyPathPrefix = "/";
     this.proxyTree = {};
-    this.pathMap = {};
+    this.allProxyDefinition = {};
     this.nodeId = hmr.getNodeId();
+    this.dirService = new DirectoryService();
   }
 
   _startService() {
@@ -18,6 +20,7 @@ export default class ProxyService extends AbstractService {
       .then(()=> this._registerProxyService())
       .then(()=> this._registerBuiltinService())
   }
+
   _stopService() {
     return Promise.resolve()
     .then(()=> this._unregisterAllProxyService())
@@ -50,6 +53,7 @@ export default class ProxyService extends AbstractService {
       });
     })
   }
+
   _registerProxyService() {
     return Promise.resolve()
       .then(()=>this._mountInprocService(this.getServiceName(), this.instanceId, this.appProxyPathPrefix, {},
@@ -60,14 +64,14 @@ export default class ProxyService extends AbstractService {
     return Promise.resolve()
   }
 
-
   _unregisterAllProxyService() {
     return Promise.resolve()
-      .then(()=>Promise.all(Object.keys(this.pathMap).map((id)=>{
-        var rule = this.pathMap[id];
-        return this._unmount0(id, rule, rule.nodeId)
+      .then(()=>Promise.all(Object.keys(this.allProxyDefinition).map((id)=>{
+        var def = this.allProxyDefinition[id];
+        return this._unmount0(id, def, def.nodeId)
       })))
   }
+
   _stopProxyService() {
     return Promise.resolve()
   }
@@ -128,35 +132,14 @@ export default class ProxyService extends AbstractService {
     }
   }
 
-  _findBasePath(path) {
+  _proxy(path, msg) {
     if (path === "/") {
       //forbidden
-      return null;
+      this.logger.warn("forbidden root directry access");
+      return Promise.resolve(this._createResponse(msg, 404));
     }
-    var names = path.substring(1).split("/");
-    var dig = (entry, index, candl)=> {
-      if (index === names.length) {
-        return candl;
-      }
-      var name = names[index]
-      if (name === "") {
-        return dig(entry, index+1, candl);
-      }
-      var next = entry.children && entry.children[name];
-      if (!next) {
-        return candl;
-      }
-      if (next.instanceIdList && next.instanceIdList.length > 0) {
-        candl = next;
-      }
-      return dig(next, index+1, candl);
-    };
-    var retObj = dig(this.proxyTree, 0);
-    return retObj ? retObj.path : null;
-  }
-
-  _proxy(path, msg) {
-    var basePath = this._findBasePath(path);
+    var pathObj = this.dirService.lookup(path);
+    var basePath = pathObj.path;
     if (!basePath) {
       this.logger.warn("service not found:%s", path);
       return Promise.resolve(this._createResponse(msg, 404));
@@ -180,6 +163,7 @@ export default class ProxyService extends AbstractService {
       return this.router.ask(entry, proxyRequest)
     });
   }
+
   _requestFromNode(msg) {
     return Promise.resolve()
       .then(()=>this._proxy(msg.m.req.path, msg))
@@ -187,6 +171,7 @@ export default class ProxyService extends AbstractService {
         m : resp.m
       })))
   }
+
   _createResponse(msg, sc, body) {
     return Object.assign(msg, {
       t : "response",
@@ -233,6 +218,7 @@ export default class ProxyService extends AbstractService {
       }
     };
   }
+
   _createDelServiceRequestMessage(instanceId, path, inprocess, nodeId) {
     return {
       i : uuidv4(),
@@ -249,6 +235,7 @@ export default class ProxyService extends AbstractService {
       }
     };  
   }
+
   _findClusterService() {
     return Promise.resolve()
     .then(()=>this.registry.lookup("ClusterService"))
@@ -260,6 +247,7 @@ export default class ProxyService extends AbstractService {
       return entry;
     })
   }
+
   _mount(msg) {
     var instanceId = uuidv4();
     var addRequest = this._createAddServiceRequestMessage(msg, instanceId);
@@ -269,96 +257,62 @@ export default class ProxyService extends AbstractService {
       .then(()=>{
         if(msg.r.inprocess) this.router.addRoute(instanceId, msg.m.instance)
       })
-      .then(()=>this._addProxyRule(msg.m.path, instanceId, msg.r.inprocess, msg.r.src))
+      .then(()=>{
+        this.allProxyDefinition[instanceId] = {
+          inprocess : msg.r.inprocess,
+          nodeId : msg.r.inprocess ? this.nodeId : msg.r.src,
+          instanceId : instanceId,
+          path : msg.m.path
+        };
+        //register dirService
+        var normalizedPath = url.parse(msg.m.path).path;
+        var dst = this.dirService.lookup(normalizedPath);
+        if (dst == null || dst.path !== normalizedPath) {
+          dst = {
+            path : normalizedPath,
+            instanceIdList : []
+          }
+          this.dirService.bind(normalizedPath, dst);
+        }
+        dst.instanceIdList.push(instanceId);
+      })
       .then(()=>instanceId)
   }
 
   _unmount(msg) {
     var instanceId = msg.m.mountId;
-    var rule = this._removeProxyRule(instanceId);
-    if (!rule) {
+    var def = this.allProxyDefinition[instanceId];
+    if (!def) {
       this.logger.warn("Mountinformation is not registered:%s", instanceId);
       return Promise.resolve();
     }
-    return this._unmount0(instanceId, rule, msg.r.src)
+    var pathObj = this.dirService.lookup(def.path);
+    if (pathObj == null) {
+      this.logger.warn("path is not registered(%s, %s). something go wrong....", instanceId, pathObj.path);
+      return Promise.resolve();
+    }
+    for (var i = 0; i < pathObj.instanceIdList.length; i++) {
+      if (pathObj.instanceIdList[i] === instanceId) {
+        pathObj.instanceIdList.splice(i, 1);
+        break;
+      }
+    }
+    if (pathObj.instanceIdList.length === 0) {
+      this.dirService.unbind(pathObj.path);
+    }
+    return this._unmount0(instanceId, def, def.nodeId)
   }
-  _unmount0(instanceId, rule, nodeId) {
-    var delRequest = this._createDelServiceRequestMessage(instanceId, rule.path, 
-      rule.inprocess, rule.inprocess ? this.nodeId : nodeId);
+
+  _unmount0(instanceId, def, nodeId) {
+    var delRequest = this._createDelServiceRequestMessage(instanceId, def.path, 
+      def.inprocess, def.inprocess ? this.nodeId : nodeId);
     
     return Promise.resolve()
       .then(()=>this._findClusterService())
       .then((entry)=>this.router.ask(entry, delRequest))
       .then(()=>{
-        if(rule.inprocess) this.router.deleteRoute(instanceId)
+        if(def.inprocess) this.router.deleteRoute(instanceId)
       })
-  }
-
-  _addProxyRule(path, instanceId, inprocess, nodeId) {
-    var normalizedPath = url.parse(path).path;
-    if (normalizedPath === "/") {
-      //root
-      this.proxyTree.root = {
-        instanceId : instanceId 
-      };
-    } else {
-      var names = normalizedPath.substring(1).split("/");
-      var find = (current, idx, path)=> {
-        if (names.length === idx) {
-          return current;
-        }
-        var name = names[idx];
-        if (name === "") {
-          // a//b
-          return find(current, idx+1, path);
-        }
-        current.children = current.children || {};
-        var next = current.children[name] = current.children[name] || {};
-        next.name = name;
-        next.path = path + "/" + name;
-        next.parent = current;
-        return find(next, idx+1,  next.path);
-      }
-      var dst = find(this.proxyTree, 0, "");
-      this.pathMap[instanceId] = {
-        path : dst.path,
-        inprocess : inprocess,
-        nodeId : inprocess ? this.nodeId : nodeId
-      };
-      dst.instanceIdList = dst.instanceIdList || [];
-      dst.instanceIdList.push(instanceId);
-    }
-  }
-
-  _removeProxyRule(instanceId) {
-    var rule = this.pathMap[instanceId];
-    if (!rule) {
-      this.logger.warn("rule not found");
-      return null;
-    }
-    var names = rule.path.substring(1).split("/");
-    var target = this.proxyTree;
-    for (var i = 0; i < names.length; i++) {
-      var name = names[i];
-      target = target.children[name];
-      if (!target) {
-        break;
-      }
-    }
-    if (!target) {
-      this.logger.warn("path is not registered. something go wrong....");
-    } else {
-      for (var i = 0; i < target.instanceIdList.length; i++) {
-        if (target.instanceIdList[i] === instanceId) {
-          target.instanceIdList.splice(i, 1);
-          break;
-        }
-      }
-      if (target.instanceIdList.length === 0) {
-        delete target.parent.children[target.name];
-      }
-    }
-    return rule;
   }
   
 }
