@@ -11,27 +11,20 @@ export default class ServiceRegistry {
     this.clusterService = clusterService;
   }
 
-  register(serviceName, instanceId, mode, condition, inprocess, nodeId) {
+  register(serviceName, instanceId, condition, inprocess, nodeId) {
     return Promise.resolve()
     .then(()=>{
       var serviceDef = this.entries[serviceName] = this.entries[serviceName] || {
         serviceName : serviceName,
-        mode : mode,
         instanceList : []
       };
-      //check mode inconsistent
-      if (serviceDef.mode !== mode) {
-        this.logger.error("Mode value(%s) is different from registered value(%s). " +
-          "serviceName: %s, instanceName: %s", mode, instanceList[0].mode, service, instanceName);
-        return Promise.reject("Different mode value is specified");
-      }
       //check duplication
       var instanceList = serviceDef.instanceList;
       for (var i = 0; i < instanceList.length; i++) {
         var entry = instanceList[i];
         if (entry.getInstanceId() === instanceId) {
           this.logger.error("Instance already registered(ServiceName: %s, InstanceId: %s). ", serviceName, instanceId);
-          return Promise.reject("Different mode value is specified");
+          return Promise.reject("Instance already registered");
         }
       }
       //push entry

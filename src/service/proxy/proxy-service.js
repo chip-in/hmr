@@ -212,7 +212,6 @@ export default class ProxyService extends AbstractService {
       },
       m : {
         instanceId : instanceId,
-        mode : msg.m.mode,
         condition : msg.m.condition,
         serviceName : this._createServiceName(msg.m.path)
       }
