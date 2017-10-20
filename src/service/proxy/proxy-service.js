@@ -2,14 +2,15 @@ import AbstractService from '../abstract-service';
 import uuidv4 from 'uuid/v4';
 import url from 'url';
 import DirectoryService from './directory-service';
+import ProxyPath from './proxy-path';
+import ProxyBackend from './proxy-backend';
 
 export default class ProxyService extends AbstractService {
 
   constructor(hmr) {
     super(hmr);
     this.appProxyPathPrefix = "/";
-    this.proxyTree = {};
-    this.allProxyDefinition = {};
+    this.allBackendDef = {};
     this.nodeId = hmr.getNodeId();
     this.dirService = new DirectoryService();
   }
@@ -27,7 +28,7 @@ export default class ProxyService extends AbstractService {
     .then(()=> this._stopProxyService())
   }
 
-  _mountInprocService(serviceName, instanceId, path, condition, mode, instance) {
+  _mountInprocService(serviceName, instanceId, path, condition, instance) {
     return Promise.resolve()
     .then(()=>this._mount({
       r : {
@@ -36,7 +37,6 @@ export default class ProxyService extends AbstractService {
       },
       t : "mount",
       m : {
-        mode : mode,
         path : path,
         instance : instance
       },
@@ -56,8 +56,7 @@ export default class ProxyService extends AbstractService {
 
   _registerProxyService() {
     return Promise.resolve()
-      .then(()=>this._mountInprocService(this.getServiceName(), this.instanceId, this.appProxyPathPrefix, {},
-       "singletonMaster", this))
+      .then(()=>this._mountInprocService(this.getServiceName(), this.instanceId, this.appProxyPathPrefix, {}, this))
   }
 
   _registerBuiltinService() {
@@ -66,10 +65,14 @@ export default class ProxyService extends AbstractService {
 
   _unregisterAllProxyService() {
     return Promise.resolve()
-      .then(()=>Promise.all(Object.keys(this.allProxyDefinition).map((id)=>{
-        var def = this.allProxyDefinition[id];
+      .then(()=>Promise.all(Object.keys(this.allBackendDef).map((id)=>{
+        var def = this.allBackendDef[id];
         return this._unmount0(id, def, def.nodeId)
       })))
+      .then(()=>{
+        this.dirService.clear();
+        this.allBackendDef = {};
+      })
   }
 
   _stopProxyService() {
@@ -124,7 +127,7 @@ export default class ProxyService extends AbstractService {
     return {
       i : uuidv4(),
       a : true,
-      s : this._createServiceName(path),
+      s : this.getServiceName(),
       t : "request",
       m : {
         req :reqMsg
@@ -139,29 +142,35 @@ export default class ProxyService extends AbstractService {
       return Promise.resolve(this._createResponse(msg, 404));
     }
     var pathObj = this.dirService.lookup(path);
-    var basePath = pathObj.path;
-    if (!basePath) {
+    if (pathObj == null) {
       this.logger.warn("service not found:%s", path);
       return Promise.resolve(this._createResponse(msg, 404));
     }
-    var serviceName = this._createServiceName(basePath);
-    return this.registry.lookup(serviceName)
-    .then((entry)=>{
-      if (!entry) {
-        this.logger.warn("path is registered but service object is not found:%s", path);
-        return Promise.resolve(this._createResponse(msg, 404));
-      }
-      var proxyRequest = {
-        i : uuidv4(),
-        s : serviceName,
-        r : {
-          src : msg.r && msg.r.src
-        },
-        t : msg.t,
-        m : Object.assign({mountId : entry.getInstanceId()}, msg.m)
-      };
-      return this.router.ask(entry, proxyRequest)
-    });
+    return pathObj.select(path, msg)
+      .then((instanceId)=>{
+        if (instanceId == null) {
+          this.logger.warn("service found but executable instance is not found:%s", path);
+          return Promise.resolve(this._createResponse(msg, 404));
+        }
+        var serviceName = this._createServiceName(pathObj.path, instanceId);
+        return this.registry.lookup(serviceName)
+          .then((entry)=>{
+            if (!entry) {
+              this.logger.warn("path is registered but service object is not found. Path:%s, instanceId:%s", path, instanceId);
+              return Promise.resolve(this._createResponse(msg, 404));
+            }
+            var proxyRequest = {
+              i : uuidv4(),
+              s : serviceName,
+              r : {
+                src : msg.r && msg.r.src
+              },
+              t : msg.t,
+              m : Object.assign({mountId : entry.getInstanceId()}, msg.m)
+            };
+            return this.router.ask(entry, proxyRequest)
+          })
+      })
   }
 
   _requestFromNode(msg) {
@@ -192,11 +201,17 @@ export default class ProxyService extends AbstractService {
     }
   }
 
-  _createServiceName(path) {
+  _createServiceName(path, instanceId) {
+    if (path == null || instanceId == null) {
+      throw new Error("path and instanceId required")
+    }
     if (path[path.length - 1] !== "/") {
       path = path + "/";
     }
-    return path === this.appProxyPathPrefix ? this.getServiceName() : this.getServiceName() + ":" + path;
+    if (path === this.appProxyPathPrefix) {
+      return this.getServiceName();
+    }
+    return this.getServiceName() + ":" + path + ":" + instanceId;
   }
 
   _createAddServiceRequestMessage(msg, instanceId) {
@@ -213,7 +228,7 @@ export default class ProxyService extends AbstractService {
       m : {
         instanceId : instanceId,
         condition : msg.m.condition,
-        serviceName : this._createServiceName(msg.m.path)
+        serviceName : this._createServiceName(msg.m.path, instanceId)
       }
     };
   }
@@ -229,7 +244,7 @@ export default class ProxyService extends AbstractService {
         src : nodeId
       },
       m : {
-        serviceName : this._createServiceName(path),
+        serviceName : this._createServiceName(path, instanceId),
         instanceId : instanceId
       }
     };  
@@ -257,49 +272,41 @@ export default class ProxyService extends AbstractService {
         if(msg.r.inprocess) this.router.addRoute(instanceId, msg.m.instance)
       })
       .then(()=>{
-        this.allProxyDefinition[instanceId] = {
-          inprocess : msg.r.inprocess,
-          nodeId : msg.r.inprocess ? this.nodeId : msg.r.src,
-          instanceId : instanceId,
-          path : msg.m.path
-        };
+        var backEnd = new ProxyBackend(msg.m.path, msg.m.mode, msg.r.inprocess ? this.nodeId : msg.r.src, instanceId, msg.r.inprocess);
+        this.allBackendDef[instanceId] = backEnd;
         //register dirService
         var normalizedPath = url.parse(msg.m.path).path;
-        var dst = this.dirService.lookup(normalizedPath);
-        if (dst == null || dst.path !== normalizedPath) {
-          dst = {
-            path : normalizedPath,
-            instanceIdList : []
-          }
-          this.dirService.bind(normalizedPath, dst);
+        var pathObj = this.dirService.lookup(normalizedPath);
+        if (pathObj == null || pathObj.path !== normalizedPath) {
+          pathObj = new ProxyPath(msg.m.path);
+          this.dirService.bind(normalizedPath, pathObj);
         }
-        dst.instanceIdList.push(instanceId);
+        return pathObj.addBackend(backEnd);
       })
       .then(()=>instanceId)
   }
 
   _unmount(msg) {
     var instanceId = msg.m.mountId;
-    var def = this.allProxyDefinition[instanceId];
+    var def = this.allBackendDef[instanceId];
     if (!def) {
       this.logger.warn("Mountinformation is not registered:%s", instanceId);
       return Promise.resolve();
     }
+    delete this.allBackendDef[instanceId];
     var pathObj = this.dirService.lookup(def.path);
     if (pathObj == null) {
       this.logger.warn("path is not registered(%s, %s). something go wrong....", instanceId, pathObj.path);
       return Promise.resolve();
     }
-    for (var i = 0; i < pathObj.instanceIdList.length; i++) {
-      if (pathObj.instanceIdList[i] === instanceId) {
-        pathObj.instanceIdList.splice(i, 1);
-        break;
-      }
-    }
-    if (pathObj.instanceIdList.length === 0) {
-      this.dirService.unbind(pathObj.path);
-    }
-    return this._unmount0(instanceId, def, def.nodeId)
+    return pathObj.removeBackend(instanceId)
+      .then(()=>{
+        if (pathObj.isEmpty()) {
+          this.dirService.unbind(def.path);
+        }
+      })
+      .then(()=>this._unmount0(instanceId, def, def.nodeId))
+    
   }
 
   _unmount0(instanceId, def, nodeId) {

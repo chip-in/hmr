@@ -5,7 +5,7 @@ export default class DirectoryService {
   
   constructor() {
     this.root = {};
-    this.logger = new Logger();
+    this.logger = new Logger("DirectoryService");
   }
 
   lookup(path) {
@@ -84,5 +84,9 @@ export default class DirectoryService {
       delete target.value;
       this.logger.debug("unbind object(" + path + ")");
     }
+  }
+
+  clear() {
+    this.root = {} ;
   }
 }
