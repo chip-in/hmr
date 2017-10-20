@@ -119,7 +119,7 @@ export default class RouterService extends AbstractService {
       end : (resp) =>{
         return Promise.resolve()
           .then(()=>{
-            if (resp.a) this._emitMessage(nodeId, resp);
+            if (resp.a) return this._emitMessage(nodeId, resp);
           })
       }
     }
@@ -141,7 +141,7 @@ export default class RouterService extends AbstractService {
   _emitMessage(nodeId, msg) {
     var socket = this.socketMap[nodeId];
     if (!socket) {
-      this.logger.error("Socket is not found:%s", nodeId);
+      this.logger.warn("Socket is not found:%s", nodeId);
       //ignore
       return Promise.reject("Socket not found");
     }

@@ -216,7 +216,10 @@ export default class ProxyService extends AbstractService {
   _setupOperations() {
     this.operations = {
       "mount" : (msg) => this._mount(msg)
-        .then((instanceId)=>this._replyResponse(msg, 0, {mountId : instanceId})),
+        .then((instanceId)=>this._replyResponse(msg, 0, {mountId : instanceId}))
+        .catch((e)=>{
+          this.logger.warn("Failed to mount. This may be caused by connection-close on trying to take semaphore ")
+        }),
       "unmount" : (msg) => this._unmount(msg)
         .then(()=>this._replySuccessResponse(msg)),
       "request" : (msg) => this._requestFromNode(msg)

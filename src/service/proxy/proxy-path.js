@@ -34,12 +34,18 @@ export default class ProxyPath {
           if (this.currentMode != null && this.currentMode !== mode) {
             this.logger.warn("Detect different mount mode on same path. path '%s' on %s mode by %s (currentMode: '%s')", be.path, mode, be.instanceId, this.currentMode);
           }
+          this.logger.debug("Try to take semaphore. path '%s' on %s mode by %s. (currentMode: '%s')", be.path, mode, be.instanceId, this.currentMode);
           this.sem.take(()=>{
+            if (!this._checkRegistering(be.instanceId)) {
+              this.logger.debug("Succeeded to take semaphore but this proxy('%s') is already removed. leave semaphore)", be.instanceId);
+              this.sem.leave();
+              resolve(be.instanceId);
+              return;
+            }
             enableBackend(mode, be);
             this.logger.debug("Succeeded to take semaphore. path '%s' on %s mode by %s. (currentMode: '%s')", be.path, mode, be.instanceId, this.currentMode);
             resolve(be.instanceId);
           })
-          this.logger.debug("Try to take semaphore. path '%s' on %s mode by %s. (currentMode: '%s')", be.path, mode, be.instanceId, this.currentMode);
           return;
         } else if (mode !== "loadBalancing") {
           this.logger.error("Unknown mode specified: %s", mode);
@@ -147,5 +153,13 @@ export default class ProxyPath {
         this.counters[instanceId] = nextCount;
         this.logger.debug("Decrement counter for backend :%s => %s", instanceId, nextCount)
       })
+  }
+  _checkRegistering(instanceId) {
+    for(var i = 0; i < this.backends.length; i++ ) {
+      if (this.backends[i].instanceId === instanceId) {
+        return true;
+      }
+    }
+    return false;
   }
 }
