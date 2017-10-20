@@ -38,6 +38,7 @@ export default class ProxyService extends AbstractService {
       t : "mount",
       m : {
         path : path,
+        mode : "singletonMaster",
         instance : instance
       },
       s : serviceName
