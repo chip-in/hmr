@@ -88,7 +88,7 @@ export default class ServiceRegistry {
         if (candl) {
           return Promise.resolve(candl);
         }
-        this.logger.warn("service not found. ServiceName:%s, instanceId:%s", service, JSON.stringify(filter));
+        this.logger.warn("service not found. ServiceName:%s, Filter:%s", service, JSON.stringify(filter));
         return Promise.resolve();
       })
   }

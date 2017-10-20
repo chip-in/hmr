@@ -86,7 +86,7 @@ export default class ClusterService extends AbstractService {
       msg.m.condition, 
       nodeId === this.hmr.getNodeId(), 
       nodeId)
-      .then(()=>this.logger.info("Succeeded to register service:%s-%s via %s", msg.m.serviceName, msg.m.instanceId, nodeId))
+      .then(()=>this.logger.info("Succeeded to register service:%s(instanceId:%s) via %s", msg.m.serviceName, msg.m.instanceId, nodeId))
       .then(()=>this._replySuccessResponse(msg))
   }
 

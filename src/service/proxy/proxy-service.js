@@ -146,6 +146,11 @@ export default class ProxyService extends AbstractService {
       this.logger.warn("service not found:%s", path);
       return Promise.resolve(this._createResponse(msg, 404));
     }
+    if (pathObj.path === "/") {
+      //forbidden
+      this.logger.warn("forbidden root directry access");
+      return Promise.resolve(this._createResponse(msg, 404));
+    }
     return pathObj.select(path, msg)
       .then((instanceId)=>{
         if (instanceId == null) {
@@ -170,6 +175,7 @@ export default class ProxyService extends AbstractService {
             };
             return this.router.ask(entry, proxyRequest)
           })
+          .then((resp)=>pathObj.decrement(instanceId).then(()=>resp))
       })
   }
 

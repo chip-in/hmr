@@ -141,7 +141,7 @@ export default class RouterService extends AbstractService {
   _emitMessage(nodeId, msg) {
     var socket = this.socketMap[nodeId];
     if (!socket) {
-      this.logger.error("Socket is not found:%s", uuid);
+      this.logger.error("Socket is not found:%s", nodeId);
       //ignore
       return Promise.reject("Socket not found");
     }
