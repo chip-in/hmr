@@ -1,6 +1,7 @@
 import Logger from '../../../util/logger';
 import parser from 'mongo-parse';
 import RegistryEntry from './registry-entry';
+import EventEmitter from 'events';
 
 export default class ServiceRegistry {
 
@@ -9,6 +10,7 @@ export default class ServiceRegistry {
     // current version is memory-based-map
     this.entries = {};
     this.clusterService = clusterService;
+    this.em = new EventEmitter();
   }
 
   register(serviceName, instanceId, condition, inprocess, nodeId) {
@@ -29,7 +31,9 @@ export default class ServiceRegistry {
       }
       //push entry
       instanceList.push(new RegistryEntry(serviceName, instanceId, condition, inprocess, nodeId))
-
+      this.emit("register", {
+        serviceName, instanceId
+      });
     })
   }
 
@@ -40,12 +44,19 @@ export default class ServiceRegistry {
       if (!serviceDef) {
         return Promise.resolve();
       }
+      var removed = false;
       var instanceList = serviceDef.instanceList;
       for (var i = instanceList.length - 1; i >= 0; i--) {
         var d = instanceList[i];
         if (d.getInstanceId() === instanceId) {
           instanceList.splice(i, 1);
+          removed = true;
         }
+      }
+      if (removed) {
+        this.emit("unregister", {
+          serviceName, instanceId
+        });
       }
     })
   }
@@ -63,6 +74,10 @@ export default class ServiceRegistry {
             var d = instanceList[i];
             if (d.getNodeId() === nodeId) {
               instanceList.splice(i, 1);
+              this.emit("unregister", {
+                serviceName : d.getServiceName(), 
+                instanceId : d.getInstanceId()
+              });
             }
           }
         }
@@ -109,5 +124,14 @@ export default class ServiceRegistry {
 
   clearAll() {
     this.entries = {};
+  }
+
+  on() {
+    //delegate
+    this.em.on.apply(this.em, Array.prototype.slice.call(arguments));
+  }
+
+  emit() {
+    this.em.emit.apply(this.em, Array.prototype.slice.call(arguments));
   }
 }

@@ -53,6 +53,21 @@ export default class ProxyService extends AbstractService {
         this._requestFromHTTP(req, res);
       });
     })
+    .then(()=>{
+      this.registry.on("unregister", (target)=>{
+        if (target == null) {
+          return ;
+        }
+        var instanceId = target.instanceId;
+        if (this.allBackendDef[instanceId] != null) {
+          this._unmount({
+            m : {
+              mountId : instanceId
+            }
+          });
+        }
+      });
+    })
   }
 
   _registerProxyService() {
