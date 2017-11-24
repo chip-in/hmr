@@ -1,5 +1,5 @@
 Name:			hmr
-Version: 		0.0.4
+Version: 		0.0.5
 Release: 		el7
 Group: 			Applications/System
 Summary:		Chip-in HMR
