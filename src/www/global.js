@@ -17,8 +17,8 @@ app.use(bodyParser.raw({
     "application/octet-stream",
     "text/xml",
     "text/xml; Charset=utf-8"
-  ]},
-  limit));
+  ],
+  limit}));
 app.use(cookieParser());
 app.use(helmet());
 
