@@ -8,15 +8,17 @@ var helmet = require('helmet');
 
 var app = express();
 
+var limit = '30mb';
 app.use(logger('combined'));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json({limit}));
+app.use(bodyParser.urlencoded({ extended: false, limit }));
 app.use(bodyParser.raw({
   "type" : [
     "application/octet-stream",
     "text/xml",
     "text/xml; Charset=utf-8"
-  ]}));
+  ]},
+  limit));
 app.use(cookieParser());
 app.use(helmet());
 
