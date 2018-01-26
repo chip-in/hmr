@@ -114,7 +114,7 @@ export default class ProxyService extends AbstractService {
         }
         if (respObj.cookies) {
           respObj.cookies.forEach((o)=>{
-            res.cookie(o.name, o.val, o.options);
+            res.cookie(o.name, o.value, o.options);
           });
         }
         if (respObj.links) {
