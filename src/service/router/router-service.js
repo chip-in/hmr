@@ -5,6 +5,8 @@ import cookie from 'cookie';
 import jwt from 'jsonwebtoken';
 import UAParser from 'ua-parser-js';
 
+const AUTH_TYPE_NAME_BEARER = "Bearer";
+
 export default class RouterService extends AbstractService {
   constructor(hmr) {
     super(hmr);
@@ -39,7 +41,7 @@ export default class RouterService extends AbstractService {
           var nodeId = uuidv4();
           this.logger.info('ResourceNode connected from %s', socket.request.socket.remoteAddress);
           this.socketMap[nodeId] = socket;
-          var userInformation = this._createUserInformation(socket);
+          var userInformation = this._createUserInformation(socket, nodeId);
           socket.on(this.webSocketMsgName, (msg)=> {
             msg.u = userInformation;
             return this._receive(nodeId, socket, msg)
@@ -222,15 +224,29 @@ export default class RouterService extends AbstractService {
     delete this.routes[instanceId];
     this.logger.info("Delete route for inprocess-service(instanceId:%s)", instanceId)
   }
-  _createUserInformation(socket) {
+  _createUserInformation(socket, nodeId) {
     var ret = {};
     if (socket.request == null) {
       return ret;
     }
+    //session information 
+    ret.session = {
+      "net.chip-in.node-id" : nodeId
+    }
+
+    //identity information
     var headers = socket.request.headers;
     //jwt token
     var obj = cookie.parse(headers["cookie"] || "");
     var token = obj && obj[this.tokenCookieValue];
+    if (token == null && headers["authorization"] != null) {
+      //check authorization header
+      var authorizationVal = headers["authorization"];
+      var parts = authorizationVal.split(' ');
+      if (parts.length === 2 && parts[0] === AUTH_TYPE_NAME_BEARER) {
+        token = parts[1];
+      }
+    }
     if (token != null) {
       try {
         var decoded = jwt.decode(token, {complete: true})
@@ -240,17 +256,22 @@ export default class RouterService extends AbstractService {
         //IGNORE
       }
     }
+
+    //device information
     //user agent
     var ua = headers["user-agent"];
+    ret.devinfo = {
+      "net.chip-in.ua" : ua,
+      "net.chip-in.dev" : ("node-XMLHttpRequest" === ua) ? "server" : "browser"
+    }
     if (ua != null) {
+      ret.devinfo["net.chip-in.ua-object"] = UAParser(ua);
+
+      //XXX for compatibility
       ret.ua = UAParser(ua);
     }
-    //TODO rule-based device detection
-    if ("node-XMLHttpRequest" === ua) {
-      ret.device = "server";
-    } else {
-      ret.device = "browser";
-    }
+    //XXX for compatibility
+    ret.device = ret.devinfo["net.chip-in.dev"];
     return ret;
   }
 }
