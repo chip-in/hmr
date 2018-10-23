@@ -94,7 +94,7 @@ export default class ClusterService extends AbstractService {
     var nodeId = msg.r.src;
     if (!this.nodeMap[nodeId]) {
       this.logger.warn("Unknown nodeId is specified(op=unregisterService). We ignore it");
-      return _replySuccessResponse(msg);
+      return this._replySuccessResponse(msg);
     }
     return this.registry.unregister(msg.m.serviceName,
       msg.m.instanceId)
