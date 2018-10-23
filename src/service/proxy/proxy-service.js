@@ -4,7 +4,27 @@ import url from 'url';
 import DirectoryService from './directory-service';
 import ProxyPath from './proxy-path';
 import ProxyBackend from './proxy-backend';
+import ACL from '../../util/acl';
+import CIUtil from '../../util/ci-util';
 
+const PATH_PREFIX_OF_APP = "/a/";
+const PATH_PREFIX_OF_DADGET = "/d/";
+
+class ACLError extends Error {
+  constructor(...params) {
+    super(...params);
+    Object.defineProperty(this, 'name', {           
+      get: () => this.constructor.name,
+    });
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ACLError);
+    }
+    // https://github.com/babel/babel/issues/4485
+    // a workaround to make `instanceof DDoSProtectionError` work in ES5
+    this.constructor = ACLError 
+    this.__proto__   = ACLError.prototype
+  }
+}
 export default class ProxyService extends AbstractService {
 
   constructor(hmr) {
@@ -17,6 +37,7 @@ export default class ProxyService extends AbstractService {
 
   _startService() {
     return Promise.resolve()
+      .then(()=> this._startACL())
       .then(()=> this._startProxyService())
       .then(()=> this._registerProxyService())
       .then(()=> this._registerBuiltinService())
@@ -26,6 +47,7 @@ export default class ProxyService extends AbstractService {
     return Promise.resolve()
     .then(()=> this._unregisterAllProxyService())
     .then(()=> this._stopProxyService())
+    .then(()=> this._stopACL())
   }
 
   _mountInprocService(serviceName, instanceId, path, condition, instance) {
@@ -43,6 +65,10 @@ export default class ProxyService extends AbstractService {
       },
       s : serviceName
     }))
+    .catch((e)=>{
+      this.logger.warn("Failed to mount inproc service. ", e)
+      throw e;
+    })
   }
 
   _startProxyService() {
@@ -97,7 +123,12 @@ export default class ProxyService extends AbstractService {
 
   _requestFromHTTP(req, res) {
     var path = req.path;
+    var accessInformation = this._resolveAccessInformationFromReq(req);
     return Promise.resolve()
+    .then(()=>this._authorize(accessInformation.subject,
+      accessInformation.type,
+      accessInformation.path,
+      accessInformation.operation))
     .then(()=>this._convertRequestMessage(req, path))
     .then((msg)=>this._proxy(path, msg))
     .then((respMsg)=>{
@@ -128,6 +159,10 @@ export default class ProxyService extends AbstractService {
         }
         res.status(respObj.statusCode || 200);
         res.send(respObj.body);
+    })
+    .catch((e)=>{
+      this.logger.error("Failed to handle request", e)
+      res.sendStatus((e instanceof ACLError) ? 403 : 500);
     })
   }
 
@@ -218,7 +253,8 @@ export default class ProxyService extends AbstractService {
       "mount" : (msg) => this._mount(msg)
         .then((instanceId)=>this._replyResponse(msg, 0, {mountId : instanceId}))
         .catch((e)=>{
-          this.logger.warn("Failed to mount. This may be caused by connection-close on trying to take semaphore ")
+          this.logger.warn("Failed to mount. ", e)
+          return this._replyResponse(msg, 403, {});
         }),
       "unmount" : (msg) => this._unmount(msg)
         .then(()=>this._replySuccessResponse(msg)),
@@ -286,11 +322,64 @@ export default class ProxyService extends AbstractService {
       return entry;
     })
   }
+  _resolveAccessInformationFromMsg(msg) {
+    var normalizedPath = url.parse(msg.m.path).path;
+    var type = "unknown";
+    var path = normalizedPath;
+    var operation = "provision";
 
+    if (normalizedPath.indexOf(PATH_PREFIX_OF_APP)===0) {
+      type = "application";
+      path = normalizedPath.substring(PATH_PREFIX_OF_APP.length-1);
+    } else if (normalizedPath.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
+      type = "dadget";
+      path = normalizedPath.substring(PATH_PREFIX_OF_DADGET.length-1);
+    } 
+    return {
+      subject : msg.u && msg.u.token,
+      type, path, operation
+    }
+  }
+  _resolveAccessInformationFromReq(req) {
+    var path = req.path;
+    var type = "unknown";
+    var operation = "provision";
+    if (path.indexOf(PATH_PREFIX_OF_APP)===0) {
+      type = "application";
+      path = path.substring(PATH_PREFIX_OF_APP.length-1);
+    } else if (path.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
+      type = "dadget";
+      path = path.substring(PATH_PREFIX_OF_DADGET.length-1);
+    } 
+    var subject = CIUtil.findTokenFromHeaders(req.headers);
+    switch(req.method) {
+      case "GET":
+      case "HEAD":
+      case "OPTIONS":
+       operation = "READ"; break;
+      case "POST":
+      case "PUT":
+      case "DELETE":
+        operation = "WRITE"; break;
+    }
+    return {
+      subject, path, type, operation
+    }
+  }
   _mount(msg) {
     var instanceId = uuidv4();
     var addRequest = this._createAddServiceRequestMessage(msg, instanceId);
+    var normalizedPath = url.parse(msg.m.path).path;
+    var accessInformation = this._resolveAccessInformationFromMsg(msg);
     return Promise.resolve()
+      .then(()=>{
+        if(!msg.r.inprocess) {
+          return this._authorize(accessInformation.subject,
+            accessInformation.type,
+            accessInformation.path,
+            accessInformation.operation)
+        }
+      })
       .then(()=>this._findClusterService())
       .then((entry)=>this.router.ask(entry, addRequest))
       .then(()=>{
@@ -300,7 +389,6 @@ export default class ProxyService extends AbstractService {
         var backEnd = new ProxyBackend(msg.m.path, msg.m.mode, msg.r.inprocess ? this.nodeId : msg.r.src, instanceId, msg.r.inprocess);
         this.allBackendDef[instanceId] = backEnd;
         //register dirService
-        var normalizedPath = url.parse(msg.m.path).path;
         var pathObj = this.dirService.lookup(normalizedPath);
         if (pathObj == null || pathObj.path !== normalizedPath) {
           pathObj = new ProxyPath(msg.m.path);
@@ -345,5 +433,28 @@ export default class ProxyService extends AbstractService {
         if(def.inprocess) this.router.deleteRoute(instanceId)
       })
   }
-  
+  _startACL() {
+    return Promise.resolve()
+      .then(()=>{
+        this.acl = new ACL();
+        return this.acl.initialize();
+      })
+  }
+  _stopACL() {
+    return Promise.resolve()
+      .then(()=>{
+        if(this.acl) {
+          return this.acl.finallize()
+        }
+      })
+  } 
+  _authorize(subject, resourceType, resourcePath, operation) {
+    return Promise.resolve()
+      .then(()=>{
+        if (!this.acl.authorize(subject, resourceType, resourcePath, operation)) {
+          this.logger.warn("ACL error detected:", {subject, resourceType, resourcePath, operation})
+          throw new ACLError("Operation not permitted")
+        }
+      })
+  }
 }

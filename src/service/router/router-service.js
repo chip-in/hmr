@@ -1,11 +1,8 @@
 import AbstractService from '../abstract-service';
 import io from 'socket.io';
 import uuidv4 from 'uuid/v4';
-import cookie from 'cookie';
-import jwt from 'jsonwebtoken';
 import UAParser from 'ua-parser-js';
-
-const AUTH_TYPE_NAME_BEARER = "Bearer";
+import CIUtil from '../../util/ci-util';
 
 export default class RouterService extends AbstractService {
   constructor(hmr) {
@@ -19,7 +16,6 @@ export default class RouterService extends AbstractService {
     this.sessionTable = {};
     this.routes = {};
     
-    this.tokenCookieValue = "access_token"
   }
 
   _startService() {
@@ -98,7 +94,7 @@ export default class RouterService extends AbstractService {
   }
 
   _handleMessage(entry, msg) {
-    var next = this._addRouteInformation(msg, entry.isInprocess(), entry.nodeId);
+    this._addRouteInformation(msg, msg.r.inprocess, entry.nodeId);
     return Promise.resolve()
       .then(()=>{
         if (entry.isInprocess()) {
@@ -233,29 +229,8 @@ export default class RouterService extends AbstractService {
     ret.session = {
       "net.chip-in.node-id" : nodeId
     }
-
-    //identity information
     var headers = socket.request.headers;
-    //jwt token
-    var obj = cookie.parse(headers["cookie"] || "");
-    var token = obj && obj[this.tokenCookieValue];
-    if (token == null && headers["authorization"] != null) {
-      //check authorization header
-      var authorizationVal = headers["authorization"];
-      var parts = authorizationVal.split(' ');
-      if (parts.length === 2 && parts[0] === AUTH_TYPE_NAME_BEARER) {
-        token = parts[1];
-      }
-    }
-    if (token != null) {
-      try {
-        var decoded = jwt.decode(token, {complete: true})
-        ret.token = decoded.payload;
-      } catch (e) {
-        this.logger.warn("Failed to parse jwt", e);
-        //IGNORE
-      }
-    }
+    ret.token = CIUtil.findTokenFromHeaders(headers);
 
     //device information
     //user agent
