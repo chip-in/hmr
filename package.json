@@ -1,6 +1,6 @@
 {
   "name": "hmr",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "chip-in HMR(HTTP Message Router) server",
   "keywords": [
     "chip-in"
@@ -34,7 +34,8 @@
     "serve-favicon": "^2.4.5",
     "socket.io": "^2.0.3",
     "ua-parser-js": "^0.7.17",
-    "uuid": "^3.1.0"
+    "uuid": "^3.1.0",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
     "babel-cli": "^6.26.0",
