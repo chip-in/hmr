@@ -1,6 +1,5 @@
 import fs from 'fs';
 import Logger from './logger';
-import YAML  from 'yamljs';
 
 var logger = new Logger("acl");
 
@@ -135,7 +134,7 @@ class ACLLoader {
           reject(e);
           return;
         }
-        var aclConfig = YAML.parse(data);
+        var aclConfig = JSON.parse(data);
         var ret = this._parseACL(aclConfig);
         resolve(ret);
       })
