@@ -24,10 +24,11 @@ app.use(compression({
   }
 }));
 app.use(logger('combined'));
-app.use(bodyParser.json({limit}));
+// app.use(bodyParser.json({limit}));
 app.use(bodyParser.urlencoded({ extended: false, limit }));
 app.use(bodyParser.raw({
   "type" : [
+    "application/json",
     "application/octet-stream",
     "text/xml",
     "text/xml; Charset=utf-8"

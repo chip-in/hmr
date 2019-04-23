@@ -3,6 +3,17 @@ import io from 'socket.io';
 import uuidv4 from 'uuid/v4';
 import UAParser from 'ua-parser-js';
 import CIUtil from '../../util/ci-util';
+import zlib from 'zlib';
+
+const perMessageDeflate = {
+  zlibDeflateOptions : {
+    level:zlib.constants.Z_BEST_SPEED,
+    chunkSize : 1 * 1024 * 1024
+  },
+  zlibInflateOptions : {
+    chunkSize : 1 * 1024 * 1024
+  }
+}
 
 export default class RouterService extends AbstractService {
   constructor(hmr) {
@@ -31,7 +42,8 @@ export default class RouterService extends AbstractService {
         var handle = io(server, {
           path: this.webSocketPath,
           pingInterval: this.v,
-          pingTimeout: this.pingTimeout
+          pingTimeout: this.pingTimeout,
+          perMessageDeflate
         });
         handle.on('connect', (socket) => {
           var nodeId = uuidv4();
