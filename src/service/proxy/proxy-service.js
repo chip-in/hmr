@@ -333,7 +333,6 @@ export default class ProxyService extends AbstractService {
       path = normalizedPath.substring(PATH_PREFIX_OF_APP.length-1);
     } else if (normalizedPath.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
       type = "dadget";
-      path = normalizedPath.substring(PATH_PREFIX_OF_DADGET.length-1);
     } 
     return {
       subject : msg.u && msg.u.token,
@@ -349,7 +348,6 @@ export default class ProxyService extends AbstractService {
       path = path.substring(PATH_PREFIX_OF_APP.length-1);
     } else if (path.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
       type = "dadget";
-      path = path.substring(PATH_PREFIX_OF_DADGET.length-1);
     } 
     var subject = CIUtil.findTokenFromHeaders(req.headers);
     switch(req.method) {
