@@ -68,12 +68,46 @@ class ACLLoader {
     }
   }
 
-  _toRegex(val) {
-    if (typeof val === "object" && 
-      typeof val.regex === "string") {
+  _isRegExpObj(val) {
+    return val != null && 
+          typeof val === "object" &&
+            typeof val.regex === "string";
+  }
+  _escapeRegex(val) {
+    return val.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  }
+  _toRegex4Dadget(val) {
+    const dbPath = "/d/:database";
+    const subsetPath = dbPath + "/subset/:subset"
+    var parts = [];
+    if (this._isRegExpObj(val)) {
+      parts = val.regex.split("/")
+        .filter(v=>v.length>0)
+        .map(v=>"("+ v +")")
+    } else if (typeof val === "string") {
+      parts = val.split("/")
+              .filter(v=>v.length>0)
+              .map(v=>this._escapeRegex(v))
+    }
+    var regexStr = "";  
+    switch(parts.length) {
+      case 1:
+        regexStr = dbPath.replace(":database", parts[0]); break;
+      case 2:
+        regexStr = subsetPath.replace(":database", parts[0])
+                      .replace(":subset", parts[1]); break;
+    }
+    return new RegExp(regexStr);
+  }
+  
+  _toRegex(val, resType) {
+    if ("dadget" === resType) {
+      return this._toRegex4Dadget(val);
+    }
+    if (this._isRegExpObj(val)) {
       return new RegExp(val.regex);
     } else if (typeof val === "string") {
-      return new RegExp("^" + val + "$")
+      return new RegExp("^" + this._escapeRegex(val) + "$")
     }
   }
 
@@ -89,7 +123,7 @@ class ACLLoader {
       var resType = res.type;
       var resPath = null;
       if (res.path != null) {
-        resPath = this._toRegex(res.path);
+        resPath = this._toRegex(res.path, resType);
         if (resPath == null) {
           logger.warn("ACL format error. Type of 'path' value must be a string or an object which contains 'regex' property")
           return ;
