@@ -3,12 +3,20 @@ language: ruby
 services:
 - docker
 install: true
+if: branch = develop AND (NOT tag =~ /a$/)
+before_script:
+- TAG=$(git describe --long)
+- VERSION=${TAG%%a*}
+- RELEASE=${TAG#*-}
+- RELEASE=${RELEASE%%-*}
 script:
 - docker build -t chipin/hmr-rpm .
 - mkdir -p /tmp/RPMS/x86_64
 - sudo chown 111:111 -R /tmp/RPMS
-- docker run -it --rm --name hmr-rpm -v /tmp/RPMS:/home/builder/rpmbuild/RPMS chipin/hmr-rpm
+- docker run -it --rm --name hmr-rpm -v /tmp/RPMS:/home/builder/rpmbuild/RPMS -e VERSION=$VERSION -e RELEASE=$RELEASE chipin/hmr-rpm
 - "(cd /tmp;tar czf - RPMS) > $TRAVIS_BUILD_DIR/hmr-rpm.tar.gz"
+before_deploy:
+- TRAVIS_TAG=$VERSION
 deploy:
   provider: releases
   api_key:
@@ -18,4 +26,4 @@ deploy:
   skip_cleanup: true
   on:
     repo: chip-in/hmr
-    tags: true
+    branch: develop

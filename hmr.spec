@@ -1,6 +1,6 @@
 Name:			hmr
-Version: 		0.0.14
-Release: 		el7
+Version: 		%{CHIP_IN_VERSION}
+Release: 		%{CHIP_IN_RELEASE}%{?dist}
 Group: 			Applications/System
 Summary:		Chip-in HMR
 Packager:		Mitsuru Nakakawaji
