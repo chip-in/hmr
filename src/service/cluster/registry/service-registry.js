@@ -13,7 +13,7 @@ export default class ServiceRegistry {
     this.em = new EventEmitter();
   }
 
-  register(serviceName, instanceId, condition, inprocess, nodeId) {
+  register(serviceName, instanceId, condition, inprocess, nodeId, option) {
     return Promise.resolve()
     .then(()=>{
       var serviceDef = this.entries[serviceName] = this.entries[serviceName] || {
@@ -30,7 +30,7 @@ export default class ServiceRegistry {
         }
       }
       //push entry
-      instanceList.push(new RegistryEntry(serviceName, instanceId, condition, inprocess, nodeId))
+      instanceList.push(new RegistryEntry(serviceName, instanceId, condition, inprocess, nodeId, option))
       this.emit("register", {
         serviceName, instanceId
       });
