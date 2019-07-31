@@ -6,9 +6,13 @@ import ProxyPath from './proxy-path';
 import ProxyBackend from './proxy-backend';
 import ACL from '../../util/acl';
 import CIUtil from '../../util/ci-util';
+import contentType from 'content-type';
 
 const PATH_PREFIX_OF_APP = "/a/";
 const PATH_PREFIX_OF_DADGET = "/d/";
+
+const MIME_TYPES_TO_STRINGIFY = ["application/json","text/xml",]
+.reduce((dst,v)=>{dst[v]=true; return dst},{})
 
 class ACLError extends Error {
   constructor(...params) {
@@ -175,6 +179,20 @@ export default class ProxyService extends AbstractService {
     props.forEach((p)=>{
       reqMsg[p] = req[p];
     })
+    try {
+      if (Buffer.isBuffer(reqMsg.body) &&
+        reqMsg.headers && 
+        reqMsg.headers["content-encoding"] == null &&
+        reqMsg.headers["content-type"] != null) {
+        const contentTypeObj = contentType.parse(reqMsg.headers["content-type"]);
+        if (MIME_TYPES_TO_STRINGIFY[contentTypeObj.type]) {
+          const charset = (contentTypeObj.parameters && contentTypeObj.parameters.charset) || "UTF-8"
+          reqMsg.body = reqMsg.body.toString(charset)
+        }
+      }
+    } catch (e) {
+      this.logger.info("Failed to convert body(%s)", e.message)
+    }
     return {
       i : uuidv4(),
       a : true,
@@ -185,6 +203,7 @@ export default class ProxyService extends AbstractService {
       }
     }
   }
+
 
   _proxy(path, msg) {
     if (path === "/") {
