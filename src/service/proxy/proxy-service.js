@@ -6,9 +6,16 @@ import ProxyPath from './proxy-path';
 import ProxyBackend from './proxy-backend';
 import ACL from '../../util/acl';
 import CIUtil from '../../util/ci-util';
+import contentType from 'content-type';
 
 const PATH_PREFIX_OF_APP = "/a/";
 const PATH_PREFIX_OF_DADGET = "/d/";
+
+const MIME_TYPES_TO_STRINGIFY = ["application/json","text/xml",]
+.reduce((dst,v)=>{dst[v]=true; return dst},{})
+
+const webSocketSkipCompressMaxSize = process.env.CNODE_WSOCKET_SKIP_COMPRESS_MAX_SIZE ? 
+  parseInt(process.env.CNODE_WSOCKET_SKIP_COMPRESS_MAX_SIZE, 10) : 10 * 1024 * 1024
 
 class ACLError extends Error {
   constructor(...params) {
@@ -175,6 +182,20 @@ export default class ProxyService extends AbstractService {
     props.forEach((p)=>{
       reqMsg[p] = req[p];
     })
+    try {
+      if (Buffer.isBuffer(reqMsg.body) &&
+        reqMsg.headers && 
+        reqMsg.headers["content-encoding"] == null &&
+        reqMsg.headers["content-type"] != null) {
+        const contentTypeObj = contentType.parse(reqMsg.headers["content-type"]);
+        if (MIME_TYPES_TO_STRINGIFY[contentTypeObj.type]) {
+          const charset = (contentTypeObj.parameters && contentTypeObj.parameters.charset) || "UTF-8"
+          reqMsg.body = reqMsg.body.toString(charset)
+        }
+      }
+    } catch (e) {
+      this.logger.info("Failed to convert body(%s)", e.message)
+    }
     return {
       i : uuidv4(),
       a : true,
@@ -185,6 +206,7 @@ export default class ProxyService extends AbstractService {
       }
     }
   }
+
 
   _proxy(path, msg) {
     if (path === "/") {
@@ -215,6 +237,14 @@ export default class ProxyService extends AbstractService {
               this.logger.warn("path is registered but service object is not found. Path:%s, instanceId:%s", path, instanceId);
               return Promise.resolve(this._createResponse(msg, 404));
             }
+            var skipCompress = entry.option &&
+                              entry.option.skipCompress && 
+                              msg.m.req &&
+                              (msg.m.req.body == null || 
+                                (Object.keys(msg.m.req.body).length === 0 && msg.m.req.body.constructor === Object) || 
+                                (msg.m.req.body &&
+                                  msg.m.req.body.length != null &&
+                                  msg.m.req.body.length < webSocketSkipCompressMaxSize ))
             var proxyRequest = {
               i : uuidv4(),
               s : serviceName,
@@ -222,7 +252,10 @@ export default class ProxyService extends AbstractService {
                 src : msg.r && msg.r.src
               },
               t : msg.t,
-              m : Object.assign({mountId : entry.getInstanceId()}, msg.m)
+              m : Object.assign({mountId : entry.getInstanceId()}, msg.m),
+              o : {
+                skipCompress
+              }
             };
             return this.router.ask(entry, proxyRequest)
           })
@@ -289,7 +322,8 @@ export default class ProxyService extends AbstractService {
       m : {
         instanceId : instanceId,
         condition : msg.m.condition,
-        serviceName : this._createServiceName(msg.m.path, instanceId)
+        serviceName : this._createServiceName(msg.m.path, instanceId),
+        option : msg.m.option
       }
     };
   }

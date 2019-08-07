@@ -5,6 +5,8 @@ import UAParser from 'ua-parser-js';
 import CIUtil from '../../util/ci-util';
 import zlib from 'zlib';
 
+const forceWebsocketCompression = process.env.FORCE_CNODE_WSOCKET_COMPRESSION ? true : false
+
 const perMessageDeflate = {
   zlibDeflateOptions : {
     level:zlib.constants.Z_BEST_SPEED,
@@ -157,9 +159,10 @@ export default class RouterService extends AbstractService {
     }
     return Promise.resolve()
       .then(()=>{
+        const compressOpt = forceWebsocketCompression ? true : ((msg.o && msg.o.skipCompress) ? false : true)
         var ret = Object.assign({}, msg);
         delete ret.r;
-        socket.emit(this.webSocketMsgName, ret);
+        socket.compress(compressOpt).emit(this.webSocketMsgName, ret);
       });
   }
 
