@@ -17,7 +17,8 @@ app.use(bodyParser.raw({
     "application/json",
     "application/octet-stream",
     "text/xml",
-    "text/xml; Charset=utf-8"
+    "text/xml; Charset=utf-8",
+    "multipart/form-data"
   ],
   limit}));
 app.use(cookieParser());
