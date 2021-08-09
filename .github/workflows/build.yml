@@ -13,13 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Set TAG
-        id: set_tag
         run: |
           echo 'TAG<<EOF' >> $GITHUB_ENV
           git describe --long >> $GITHUB_ENV
           echo 'EOF' >> $GITHUB_ENV
+          echo $GITHUB_ENV
       - name: Set VERSION
-        run: echo 'VERSION=${TAG%%a*}' >> $GITHUB_ENV
+        run: echo 'VERSION=${${{ env.TAG }}%%a*}' >> $GITHUB_ENV
       - name: Set RELEASE
         run: echo 'RELEASE=${TAG#*-}' >> $GITHUB_ENV
       - name: Set RELEASE2
