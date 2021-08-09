@@ -37,3 +37,4 @@ jobs:
           files: hmr-rpm.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ''
