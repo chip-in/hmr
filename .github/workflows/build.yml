@@ -1,0 +1,32 @@
+name: CI
+on:
+  push:
+    tags-ignore:
+      - '*a'
+    branches:
+      - 'develop'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set TAG
+        run: |
+          echo 'TAG<<EOF' >> $GITHUB_ENV
+          git describe --long >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+      - name: Set VERSION
+        run: echo 'VERSION=${TAG%%a*}' >> $GITHUB_ENV
+      - name: Set RELEASE
+        run: echo 'RELEASE=${TAG#*-}' >> $GITHUB_ENV
+      - name: Set RELEASE2
+        run: echo 'RELEASE=${RELEASE%%-*}' >> $GITHUB_ENV
+      - name: Build
+        env:
+          TRAVIS_BUILD_DIR: ${{ github.workspace }}
+        run: |
+          echo $VERSION
+          echo $RELEASE
+          echo $TRAVIS_BUILD_DIR
