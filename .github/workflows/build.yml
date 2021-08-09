@@ -13,6 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Set TAG
+        id: set_tag
         run: |
           echo 'TAG<<EOF' >> $GITHUB_ENV
           git describe --long >> $GITHUB_ENV
