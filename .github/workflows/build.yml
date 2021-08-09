@@ -28,7 +28,11 @@ jobs:
           docker build -t chipin/hmr-rpm .
           mkdir -p /tmp/RPMS/x86_64
           sudo chown 111:111 -R /tmp/RPMS
+<<<<<<< HEAD
           docker run --rm --name hmr-rpm -v /tmp/RPMS:/home/builder/rpmbuild/RPMS -e VERSION=$VERSION -e RELEASE=$RELEASE chipin/hmr-rpm
+=======
+          docker run -it --rm --name hmr-rpm -v /tmp/RPMS:/home/builder/rpmbuild/RPMS -e VERSION=$VERSION -e RELEASE=$RELEASE chipin/hmr-rpm
+>>>>>>> 66486d1e2463455886ecd4b789c57d6f57bfaa1c
           "(cd /tmp;tar czf - RPMS) > $TRAVIS_BUILD_DIR/hmr-rpm.tar.gz"
       - name: Release
         uses: softprops/action-gh-release@v1
