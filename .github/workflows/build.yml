@@ -15,8 +15,8 @@ jobs:
           echo 'TAG<<EOF' >> $GITHUB_ENV
           git describe --long >> $GITHUB_ENV
           echo 'EOF' >> $GITHUB_ENV
-      - name: Set VER
-        run: echo VER=${TAG%%a*} >> $GITHUB_ENV
+      - name: Set VERSION
+        run: echo VERSION=${TAG%%a*} >> $GITHUB_ENV
       - name: Set RELEASE
         run: echo RELEASE=${TAG#*-} >> $GITHUB_ENV
       - name: Set RELEASE2
@@ -28,7 +28,7 @@ jobs:
           docker build -t chipin/hmr-rpm .
           mkdir -p /tmp/RPMS/x86_64
           sudo chown 111:111 -R /tmp/RPMS
-          docker run --rm --name hmr-rpm -v /tmp/RPMS:/home/builder/rpmbuild/RPMS -e VERSION=$VER -e RELEASE=$RELEASE chipin/hmr-rpm
+          docker run --rm --name hmr-rpm -v /tmp/RPMS:/home/builder/rpmbuild/RPMS -e VERSION=$VERSION -e RELEASE=$RELEASE chipin/hmr-rpm
           (cd /tmp;tar czf - RPMS) > $TRAVIS_BUILD_DIR/hmr-rpm.tar.gz
       - name: Release
         uses: softprops/action-gh-release@v1
