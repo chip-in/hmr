@@ -1,6 +1,8 @@
 name: CI
 on:
   push:
+    tags:
+      - '*'
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -9,16 +11,11 @@ jobs:
         with:
           fetch-depth: 0
       - name: Set TAG
-        run: |
-          echo 'TAG<<EOF' >> $GITHUB_ENV
-          git describe --long >> $GITHUB_ENV
-          echo 'EOF' >> $GITHUB_ENV
+        run: TAG=${GITHUB_REF##*/}
       - name: Set VERSION
-        run: echo VERSION=${TAG%%a*} >> $GITHUB_ENV
+        run: echo VERSION=${TAG%.*} >> $GITHUB_ENV
       - name: Set RELEASE
-        run: echo RELEASE=${TAG#*-} >> $GITHUB_ENV
-      - name: Set RELEASE2
-        run: echo RELEASE=${RELEASE%%-*} >> $GITHUB_ENV
+        run: echo RELEASE=${TAG##*.} >> $GITHUB_ENV
       - name: Build
         env:
           TRAVIS_BUILD_DIR: ${{ github.workspace }}
