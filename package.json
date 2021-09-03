@@ -13,7 +13,7 @@
     "start": "node lib/main.js",
     "cleanbuild": "npm run clean && npm run build",
     "build": "babel src -s inline -d lib/",
-    "clean": "del-cli lib",
+    "clean": "rimraf lib",
     "debug": "node --inspect --inspect-brk --inspect-port=9230 lib/main.js",
     "watch": "npm run clean && babel src -s inline -d lib/ -w"
   },
@@ -26,20 +26,20 @@
     "debug": "^2.6.9",
     "ejs": "~2.5.6",
     "express": "^4.16.4",
-    "helmet": "^3.8.2",
+    "helmet": "^4.6.0",
     "jsonwebtoken": "^8.1.0",
     "mongo-parse": "^2.0.3",
     "morgan": "^1.9.1",
     "semaphore": "^1.1.0",
     "serve-favicon": "^2.4.5",
-    "socket.io": "^2.2.0",
-    "ua-parser-js": "^0.7.17",
+    "socket.io": "^2.4.1",
+    "ua-parser-js": "^0.7.28",
     "uuid": "^3.1.0"
   },
   "devDependencies": {
-    "@babel/cli": "^7.5.0",
+    "@babel/cli": "^7.15.4",
     "@babel/core": "^7.5.4",
     "@babel/preset-env": "^7.5.4",
-    "del-cli": "^1.1.0"
+    "rimraf": "^3.0.2"
   }
 }
