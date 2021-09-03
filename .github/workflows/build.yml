@@ -11,7 +11,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Set TAG
-        run: TAG=${GITHUB_REF##*/}
+        run: echo TAG=${GITHUB_REF##*/} >> $GITHUB_ENV
       - name: Set VERSION
         run: echo VERSION=${TAG%.*} >> $GITHUB_ENV
       - name: Set RELEASE
