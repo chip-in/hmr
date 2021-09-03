@@ -17,6 +17,8 @@ const MIME_TYPES_TO_STRINGIFY = ["application/json","text/xml",]
 const webSocketSkipCompressMaxSize = process.env.CNODE_WSOCKET_SKIP_COMPRESS_MAX_SIZE ? 
   parseInt(process.env.CNODE_WSOCKET_SKIP_COMPRESS_MAX_SIZE, 10) : 10 * 1024 * 1024
 
+var timeoutSecond = process.env.CNODE_HTTP_TIMEOUT || '600';
+
 class ACLError extends Error {
   constructor(...params) {
     super(...params);
@@ -83,6 +85,7 @@ export default class ProxyService extends AbstractService {
     .then(()=>{
       var app = this.hmr.getWebServer().getApplication();
       app.use(this.appProxyPathPrefix, (req, res)=>{
+        req.setTimeout(Number(timeoutSecond) * 2 * 1000)
         this._requestFromHTTP(req, res);
       });
     })
@@ -139,6 +142,10 @@ export default class ProxyService extends AbstractService {
     .then(()=>this._convertRequestMessage(req, path))
     .then((msg)=>this._proxy(path, msg))
     .then((respMsg)=>{
+        if (req.timedout) {
+          this.logger.warn(`response is returned but request has already timed out: request='${msg}'`)
+          return;
+        }
         if (respMsg.t !== "response") {
           this.logger.error("unexpected response format:%s", JSON.stringify(respMsg))
           res.sendStatus(500);
@@ -168,6 +175,10 @@ export default class ProxyService extends AbstractService {
         res.send(respObj.body);
     })
     .catch((e)=>{
+      if (req.timedout) {
+        this.logger.warn("response is returned but request has alread timed out:%s", path)
+        return;
+      }
       this.logger.error("Failed to handle request", e)
       res.sendStatus((e instanceof ACLError) ? 403 : 500);
     })

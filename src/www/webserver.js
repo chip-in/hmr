@@ -120,14 +120,12 @@ export default class WebServer extends AbstractModule {
     });
 
     // error handler
-    app.use(function (err, req, res, next) {
-      // set locals, only providing error in development
-      res.locals.message = err.message;
-      res.locals.error = req.app.get('env') === 'development' ? err : {};
+    app.use((err, req, res, next) => {
+      this.logger.error(`Error occured. res.headersSent=${res.headersSent}. req.timedout='${req.timedout}' req='${req.method.toUpperCase()} ${req.url}'`, err);
 
-      // render the error page
-      res.status(err.status || 500);
-      res.render('error');
-    });
+      if(!res.headersSent) {
+        res.status(502).send({})
+      }
+    })
   }
 }
