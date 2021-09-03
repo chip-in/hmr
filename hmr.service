@@ -4,6 +4,8 @@ After=network.target docker.service
 
 [Service]
 WorkingDirectory=/usr/local/chip-in/hmr
+ExecStartPre=/usr/local/chip-in/hmr/env.sh
+EnvironmentFile=-/etc/sysconfig/hmr
 ExecStart=/usr/local/nodejs/bin/npm start
 Restart=on-failure
 StartLimitBurst=0

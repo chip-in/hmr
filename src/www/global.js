@@ -5,22 +5,35 @@ var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var helmet = require('helmet');
+var timeout = require('connect-timeout'); 
 
 var app = express();
 
-var limit = '30mb';
+var limit = process.env.CNODE_HTTP_MAX_BODY_SIZE || '30mb';
+var timeoutSecond = process.env.CNODE_HTTP_TIMEOUT || '600';
+
+function haltOnTimedout (req, res, next) {
+  if (!req.timedout) next()
+}
+
+app.use(timeout(String(Number(timeoutSecond) * 1000)))
 app.use(logger('combined'));
 // app.use(bodyParser.json({limit}));
 app.use(bodyParser.urlencoded({ extended: false, limit }));
+app.use(haltOnTimedout)
 app.use(bodyParser.raw({
   "type" : [
     "application/json",
     "application/octet-stream",
     "text/xml",
-    "text/xml; Charset=utf-8"
+    "text/xml; Charset=utf-8",
+    "multipart/form-data"
   ],
   limit}));
+app.use(haltOnTimedout)
 app.use(cookieParser());
+app.use(haltOnTimedout)
 app.use(helmet());
+app.use(haltOnTimedout)
 
 module.exports = app;
