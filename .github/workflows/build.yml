@@ -30,5 +30,6 @@ jobs:
           (cd /tmp;tar czf - RPMS) > $TRAVIS_BUILD_DIR/hmr-rpm.tar.gz
       - name: Release
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: hmr-rpm.tar.gz
