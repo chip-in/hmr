@@ -47,5 +47,5 @@ rm -rf $RPM_BUILD_ROOT
 
 %defattr(-,root,root)
 %{installdir}/hmr/
-%attr(755,root,root) %{installdir}/env.sh
+%attr(755,root,root) %{installdir}/hmr/env.sh
 %{systemddir}/hmr.service
