@@ -137,7 +137,7 @@ export default class RouterService extends AbstractService {
     }
   }
   
-  _createInternalSessionObject(msg, cb){ 
+  _createInternalSessionObject(msg, cb, cb2){ 
     return {
       sessionId : msg.c,
       nodeId : this.hmr.getNodeId(),
@@ -146,7 +146,10 @@ export default class RouterService extends AbstractService {
           .then(()=>{
             if (resp.a) cb(resp);
           })
-      }
+      },
+      forceClose : () =>[
+        cb2()
+      ]
     }
   }
 
@@ -213,6 +216,8 @@ export default class RouterService extends AbstractService {
         return new Promise((resolve, reject)=>{
           this.sessionTable[msg.i] = this._createInternalSessionObject(msg, (resp)=>{
             resolve(resp);
+          }, () => {
+            reject()
           });
           this.send(entry, Object.assign({a:true}, msg));
           //wait response
@@ -222,6 +227,18 @@ export default class RouterService extends AbstractService {
   _stopService() {
     return Promise.resolve()
       .then(()=> {
+        var closeSessionTable = this.sessionTable
+        for (var sessionId in closeSessionTable) {
+          if (this.sessionTable[sessionId] && typeof closeSessionTable[sessionId].forceClose === "function") {
+            this.logger.info(`Try to close request. session-id:${sessionId}`)
+            try {
+              this.sessionTable[sessionId].forceClose()
+            } catch (e) {
+              //IGNORE
+              this.logger.info(`Failed to close request. session-id:${sessionId}`, e)
+            }
+          }
+        }
         var closeSocketMap = this.socketMap
         for (var k in closeSocketMap) {
           this.logger.info(`Try to disconnect socket. resource-node:${k}`)
