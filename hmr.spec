@@ -24,7 +24,8 @@ mkdir -p $RPM_BUILD_ROOT%{installdir}/ $RPM_BUILD_ROOT%{systemddir}
 cp -pr $RPM_SOURCE_DIR/hmr $RPM_BUILD_ROOT%{installdir}/ \
   && cd $RPM_BUILD_ROOT%{installdir}/hmr \
   && npm install \
-  && npm run cleanbuild
+  && npm run cleanbuild \
+  && chmod +x env.sh
 
 find $RPM_BUILD_ROOT%{installdir}/ -type f | xargs -i sed -i -e "s/$(echo "$RPM_BUILD_ROOT" | sed -e "s/\//\\\\\//g")//g" {}
 cp $RPM_SOURCE_DIR/hmr/hmr.service $RPM_BUILD_ROOT%{systemddir}/
