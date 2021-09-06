@@ -221,6 +221,19 @@ export default class RouterService extends AbstractService {
   }
   _stopService() {
     return Promise.resolve()
+      .then(()=> {
+        var closeSocketMap = this.socketMap
+        for (var k in closeSocketMap) {
+          this.logger.info(`Try to disconnect socket. resource-node:${k}`)
+          try {
+            closeSocketMap[k].disconnect(true)
+            this.logger.info(`Succeeded to disconnect socket. resource-node:${k}`)
+          } catch (e) {
+            //IGNORE
+            this.logger.info(`Failed to disconnect socket. resource-node:${k}`, e)
+          }
+        }
+      })
       .then(()=>{
         this.sessionTable = {};
         this.socketMap = {};
