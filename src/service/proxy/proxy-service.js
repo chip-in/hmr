@@ -176,7 +176,7 @@ export default class ProxyService extends AbstractService {
     })
     .catch((e)=>{
       if (req.timedout) {
-        this.logger.warn("response is returned but request has alread timed out:%s", path)
+        this.logger.warn(`response is returned but request has already timed out: request='${msg}'`, e)
         return;
       }
       this.logger.error("Failed to handle request", e)

@@ -48,7 +48,7 @@ export default class ClusterService extends AbstractService {
   _registerNode(msg) {
     var nodeId = msg.r && msg.r.src;
     if (this.nodeMap[nodeId]) {
-      this.logger.warn("nodeId has alread been registered:%s", nodeId);
+      this.logger.warn("nodeId has already been registered:%s", nodeId);
       return this._replyResponse(msg, 400);
     }
     return Promise.resolve()
