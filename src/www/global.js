@@ -11,6 +11,7 @@ var app = express();
 
 var limit = process.env.CNODE_HTTP_MAX_BODY_SIZE || '30mb';
 var timeoutSecond = process.env.CNODE_HTTP_TIMEOUT || '600';
+var helmetOptsStr = process.env.CNODE_HMR_HELMET_OPTS || null;
 
 function haltOnTimedout (req, res, next) {
   if (!req.timedout) next()
@@ -33,7 +34,16 @@ app.use(bodyParser.raw({
 app.use(haltOnTimedout)
 app.use(cookieParser());
 app.use(haltOnTimedout)
-app.use(helmet());
+var helmetOpts = {hsts:false,contentSecurityPolicy:false}
+if (helmetOptsStr) {
+  try {
+    helmetOpts = JSON.parse(helmetOptsStr)
+  } catch (e) {
+    console.error("Failed to parse helmet option", e)
+    //CONTINUE
+  }
+}
+app.use(helmet(helmetOpts));
 app.use(haltOnTimedout)
 
 module.exports = app;
