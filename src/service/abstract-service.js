@@ -117,4 +117,8 @@ export default class AbstractService {
       })
       .then((msg)=>this.router.answer(msg))
   }
+
+  async getProperty(name) {
+    return null
+  }
 }

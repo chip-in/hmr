@@ -50,7 +50,7 @@ export default class RouterService extends AbstractService {
         handle.on('connect', (socket) => {
           var nodeId = uuidv4();
           this.logger.info('ResourceNode connected from %s', socket.request.socket.remoteAddress);
-          this.socketMap[nodeId] = socket;
+          this.socketMap[nodeId] = {connectDatetime: new Date().toISOString(), socket};
           var userInformation = this._createUserInformation(socket, nodeId);
           socket.on(this.webSocketMsgName, (msg)=> {
             msg.u = userInformation;
@@ -128,6 +128,7 @@ export default class RouterService extends AbstractService {
     return {
       sessionId : msg.c,
       nodeId : nodeId,
+      requested: new Date().toISOString(),
       end : (resp) =>{
         return Promise.resolve()
           .then(()=>{
@@ -154,7 +155,7 @@ export default class RouterService extends AbstractService {
   }
 
   _emitMessage(nodeId, msg) {
-    var socket = this.socketMap[nodeId];
+    var socket = this.socketMap[nodeId].socket;
     if (!socket) {
       this.logger.warn("Socket is not found:%s", nodeId);
       //ignore
@@ -243,7 +244,7 @@ export default class RouterService extends AbstractService {
         for (var k in closeSocketMap) {
           this.logger.info(`Try to disconnect socket. resource-node:${k}`)
           try {
-            closeSocketMap[k].disconnect(true)
+            closeSocketMap[k].socket.disconnect(true)
             this.logger.info(`Succeeded to disconnect socket. resource-node:${k}`)
           } catch (e) {
             //IGNORE
@@ -293,5 +294,25 @@ export default class RouterService extends AbstractService {
     //XXX for compatibility
     ret.device = ret.devinfo["net.chip-in.dev"];
     return ret;
+  }
+  
+  async getProperty(name) {
+    let result = null
+    switch(name) {
+      case "requests":
+        result = JSON.parse(JSON.stringify(this.sessionTable))
+        break
+      case "sockets":
+        result = Object.keys(this.socketMap).map((key) => {
+          let headers = this.socketMap[key].socket.request.headers
+          return {
+            nodeId: key,
+            connectDatetime: this.socketMap[key].connectDatetime,
+            remoteAddress: headers["x-real-ip"]
+          }
+        })
+        break
+    }
+    return result
   }
 }

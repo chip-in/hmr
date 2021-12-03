@@ -162,4 +162,19 @@ export default class ProxyPath {
     }
     return false;
   }
+
+  dump() {
+    return {
+      "path": this.path,
+      "backend" : this.backends.map(b=>{return {
+        nodeId: b.nodeId,
+        instanceId: b.instanceId,
+        inprocess: b.inprocess,
+        counter: this.counters[b.instanceId],
+        available: this.availables.filter(a=>a.instanceId === b.instanceId).length > 0
+      }}),
+      "mode" : this.currentMode
+    }
+  }
+  
 }

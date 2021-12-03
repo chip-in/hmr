@@ -22,10 +22,10 @@ export default class ClusterService extends AbstractService {
       .then(()=>this.logger.info("This node's ID is %s", this.hmr.getNodeId()))
       .then(()=>this.registry.register("ClusterService", 
         this.instanceId, 
-        "singletonMaster",
         {},
         true,
-        this.hmr.getNodeId()))
+        this.hmr.getNodeId(),
+        {}))
       .then(()=>this.router.addRoute(this.instanceId, this))
   }
 
@@ -103,4 +103,16 @@ export default class ClusterService extends AbstractService {
       .then(()=>this._replySuccessResponse(msg))
   }
 
+  async getProperty(name) {
+    let result = null
+    switch(name) {
+      case "nodes":
+        result = JSON.parse(JSON.stringify(Object.keys(this.nodeMap)))
+        break
+      case "services":
+        result = this.registry.dump()
+        break
+    }
+    return result
+  }
 }

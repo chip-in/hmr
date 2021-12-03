@@ -500,4 +500,13 @@ export default class ProxyService extends AbstractService {
         }
       })
   }
+  async getProperty(name) {
+    let result = null
+    switch(name) {
+      case "paths":
+        result = this.dirService.dump()
+        break
+    }
+    return result
+  }
 }

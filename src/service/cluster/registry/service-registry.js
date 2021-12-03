@@ -134,4 +134,8 @@ export default class ServiceRegistry {
   emit() {
     this.em.emit.apply(this.em, Array.prototype.slice.call(arguments));
   }
+
+  dump() {
+    return JSON.parse(JSON.stringify(this.entries))
+  }
 }
