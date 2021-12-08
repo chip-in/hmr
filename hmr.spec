@@ -25,7 +25,8 @@ cp -pr $RPM_SOURCE_DIR/hmr $RPM_BUILD_ROOT%{installdir}/ \
   && cd $RPM_BUILD_ROOT%{installdir}/hmr \
   && npm install \
   && npm run cleanbuild \
-  && chmod +x env.sh
+  && chmod +x env.sh \
+  && chmod +x bin/hmradmin.js
 
 find $RPM_BUILD_ROOT%{installdir}/ -type f | xargs -i sed -i -e "s/$(echo "$RPM_BUILD_ROOT" | sed -e "s/\//\\\\\//g")//g" {}
 cp $RPM_SOURCE_DIR/hmr/hmr.service $RPM_BUILD_ROOT%{systemddir}/
@@ -35,7 +36,7 @@ cp $RPM_SOURCE_DIR/hmr/hmr.service $RPM_BUILD_ROOT%{systemddir}/
 
 %post
 systemctl daemon-reload
-
+ln -s %{installdir}/hmr/bin/hmradmin.js /usr/local/bin/hmradmin
 
 %preun
 
@@ -48,4 +49,5 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %{installdir}/hmr/
 %attr(755,root,root) %{installdir}/hmr/env.sh
+%attr(755,root,root) %{installdir}/hmr/bin/hmradmin.js
 %{systemddir}/hmr.service
