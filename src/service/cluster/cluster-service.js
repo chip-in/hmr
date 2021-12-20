@@ -22,10 +22,10 @@ export default class ClusterService extends AbstractService {
       .then(()=>this.logger.info("This node's ID is %s", this.hmr.getNodeId()))
       .then(()=>this.registry.register("ClusterService", 
         this.instanceId, 
-        "singletonMaster",
         {},
         true,
-        this.hmr.getNodeId()))
+        this.hmr.getNodeId(),
+        {}))
       .then(()=>this.router.addRoute(this.instanceId, this))
   }
 
@@ -48,7 +48,7 @@ export default class ClusterService extends AbstractService {
   _registerNode(msg) {
     var nodeId = msg.r && msg.r.src;
     if (this.nodeMap[nodeId]) {
-      this.logger.warn("nodeId has alread been registered:%s", nodeId);
+      this.logger.warn("nodeId has already been registered:%s", nodeId);
       return this._replyResponse(msg, 400);
     }
     return Promise.resolve()
@@ -103,4 +103,16 @@ export default class ClusterService extends AbstractService {
       .then(()=>this._replySuccessResponse(msg))
   }
 
+  async getProperty(name) {
+    let result = null
+    switch(name) {
+      case "nodes":
+        result = JSON.parse(JSON.stringify(Object.keys(this.nodeMap)))
+        break
+      case "services":
+        result = this.registry.dump()
+        break
+    }
+    return result
+  }
 }

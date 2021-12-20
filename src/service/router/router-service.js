@@ -50,7 +50,7 @@ export default class RouterService extends AbstractService {
         handle.on('connect', (socket) => {
           var nodeId = uuidv4();
           this.logger.info('ResourceNode connected from %s', socket.request.socket.remoteAddress);
-          this.socketMap[nodeId] = socket;
+          this.socketMap[nodeId] = {connectDatetime: new Date().toISOString(), socket};
           var userInformation = this._createUserInformation(socket, nodeId);
           socket.on(this.webSocketMsgName, (msg)=> {
             msg.u = userInformation;
@@ -128,6 +128,7 @@ export default class RouterService extends AbstractService {
     return {
       sessionId : msg.c,
       nodeId : nodeId,
+      requested: new Date().toISOString(),
       end : (resp) =>{
         return Promise.resolve()
           .then(()=>{
@@ -137,7 +138,7 @@ export default class RouterService extends AbstractService {
     }
   }
   
-  _createInternalSessionObject(msg, cb){ 
+  _createInternalSessionObject(msg, cb, cb2){ 
     return {
       sessionId : msg.c,
       nodeId : this.hmr.getNodeId(),
@@ -146,12 +147,15 @@ export default class RouterService extends AbstractService {
           .then(()=>{
             if (resp.a) cb(resp);
           })
-      }
+      },
+      forceClose : () =>[
+        cb2()
+      ]
     }
   }
 
   _emitMessage(nodeId, msg) {
-    var socket = this.socketMap[nodeId];
+    var socket = this.socketMap[nodeId].socket;
     if (!socket) {
       this.logger.warn("Socket is not found:%s", nodeId);
       //ignore
@@ -213,6 +217,8 @@ export default class RouterService extends AbstractService {
         return new Promise((resolve, reject)=>{
           this.sessionTable[msg.i] = this._createInternalSessionObject(msg, (resp)=>{
             resolve(resp);
+          }, () => {
+            reject()
           });
           this.send(entry, Object.assign({a:true}, msg));
           //wait response
@@ -221,6 +227,31 @@ export default class RouterService extends AbstractService {
   }
   _stopService() {
     return Promise.resolve()
+      .then(()=> {
+        var closeSessionTable = this.sessionTable
+        for (var sessionId in closeSessionTable) {
+          if (this.sessionTable[sessionId] && typeof closeSessionTable[sessionId].forceClose === "function") {
+            this.logger.info(`Try to close request. session-id:${sessionId}`)
+            try {
+              this.sessionTable[sessionId].forceClose()
+            } catch (e) {
+              //IGNORE
+              this.logger.info(`Failed to close request. session-id:${sessionId}`, e)
+            }
+          }
+        }
+        var closeSocketMap = this.socketMap
+        for (var k in closeSocketMap) {
+          this.logger.info(`Try to disconnect socket. resource-node:${k}`)
+          try {
+            closeSocketMap[k].socket.disconnect(true)
+            this.logger.info(`Succeeded to disconnect socket. resource-node:${k}`)
+          } catch (e) {
+            //IGNORE
+            this.logger.info(`Failed to disconnect socket. resource-node:${k}`, e)
+          }
+        }
+      })
       .then(()=>{
         this.sessionTable = {};
         this.socketMap = {};
@@ -263,5 +294,25 @@ export default class RouterService extends AbstractService {
     //XXX for compatibility
     ret.device = ret.devinfo["net.chip-in.dev"];
     return ret;
+  }
+  
+  async getProperty(name) {
+    let result = null
+    switch(name) {
+      case "requests":
+        result = JSON.parse(JSON.stringify(this.sessionTable))
+        break
+      case "sockets":
+        result = Object.keys(this.socketMap).map((key) => {
+          let headers = this.socketMap[key].socket.request.headers
+          return {
+            nodeId: key,
+            connectDatetime: this.socketMap[key].connectDatetime,
+            remoteAddress: headers["x-real-ip"]
+          }
+        })
+        break
+    }
+    return result
   }
 }

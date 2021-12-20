@@ -21,6 +21,10 @@ export default class Services extends AbstractModule{
     ];
     this.services.map((s)=>s.setServiceRegistry(clusterService.getServiceRegistry()));
     this.services.map((s)=>s.setRouter(routerService));
+    this.serviceMap = this.services.reduce((dst, svc)=> {
+      dst[svc.getServiceName()] = svc
+      return dst
+    }, {})
   }
 
   _startModule() {
@@ -31,5 +35,9 @@ export default class Services extends AbstractModule{
   _stopModule() {
     return Promise.resolve()
       .then(()=>Array.prototype.slice.call(this.services).reverse().reduce((prev, current)=>prev.then(()=>current.stop()), Promise.resolve()))
+  }
+
+  getService(name) {
+    return this.serviceMap[name]
   }
 }

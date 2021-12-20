@@ -89,4 +89,24 @@ export default class DirectoryService {
   clear() {
     this.root = {} ;
   }
+  
+  dump() {
+    const dumpRecursive = (dst, names, o) => {
+      if (o.value) {
+        dst.push({
+          path: "/" + names.join("/"),
+          object: typeof o.value.dump === "function" ? o.value.dump() : JSON.parse(JSON.stringify(o.value))
+        })
+      }
+      if (o.children) {
+        for (var key in o.children) {
+          var entry = o.children[key]
+          dumpRecursive(dst, names.concat(key), entry)
+        }
+      }
+    }
+    var dst = []
+    dumpRecursive(dst, [], this.root)
+    return JSON.parse(JSON.stringify(dst))
+  }
 }

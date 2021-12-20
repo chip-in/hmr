@@ -1,4 +1,6 @@
 import AbstractModule from '../abstract-module';
+var http = require('http'),
+  globalOpts = require('./global');
 
 /**
  * Normalize a port into a number, string, or false.
@@ -20,10 +22,15 @@ function normalizePort(val) {
   return false;
 }
 
-export default class WebServer extends AbstractModule {
+class AbstractWebServer extends AbstractModule {
 
-  constructor(hmr) {
+  constructor(hmr, port, address) {
     super(hmr);
+    if (!port) {
+      throw new Error("port not specified")
+    }
+    this.port = port
+    this.address = address || "0.0.0.0"
   }
 
   _startModule() {
@@ -31,18 +38,21 @@ export default class WebServer extends AbstractModule {
       .then(() => this._startServer())
   }
 
+  createApplication(){
+    throw new Error("Do not call abstract method createApplication")
+  }
+  
   _startServer() {
     return Promise.resolve()
       .then(()=>{
         return new Promise((resolve, reject)=>{
-          var app = require('./global');
-          var http = require('http');
+          var app = this.createApplication();
 
-          var port = normalizePort(process.env.PORT || '3000');
+          var port = normalizePort(this.port);
           this.logger.info("listen port %s", port);
           app.set('port', port);
           var server = http.createServer(app);
-          server.listen(port);
+          server.listen(port, this.address);
           server.on('error', (error) => {
             if (error.syscall !== 'listen') {
               this.logger.error("Error detected at webserver ", error);
@@ -129,3 +139,47 @@ export default class WebServer extends AbstractModule {
     })
   }
 }
+class WebServer extends AbstractWebServer {
+  constructor(hmr) {
+    super(hmr, process.env.PORT || '3000')
+  }
+  createApplication() {
+    return globalOpts()
+  }
+}
+
+class ManagementWebServer extends AbstractWebServer {
+  constructor(hmr) {
+    super(hmr, process.env.MANAGE_PORT || '9000', '127.0.0.1')
+  }
+  createApplication() {
+    var ret = globalOpts()
+    ret.use("/api/:service/:property", (req, res)=>{
+      const {service, property} = req.params
+      const services = this.hmr.getServices()
+      const instance = services.getService(service)
+      if (!instance) {
+        res.status(400).send({"message": `Unknown service ${service}`})
+        return
+      }
+      try {
+        instance.getProperty(property)
+        .then((ret) => {
+          var body = {}
+          body[property] = ret
+          res.status(200).send(body)
+        })
+        .catch((e) => {
+          this.logger.error("Error detected at management webserver ", e);
+          res.status(500).send({"message": "ServerError"})
+        })
+      } catch(e) {
+        this.logger.error("Error detected at management webserver ", e);
+        res.status(500).send({"message": "ServerError"})
+      }
+    });
+    return ret
+  }
+}
+
+export {WebServer, ManagementWebServer}

@@ -1,7 +1,7 @@
 'use strict'
 import uuidv4 from 'uuid/v4';
 import Logger from './util/logger';
-import WebServer from './www/webserver';
+import {WebServer, ManagementWebServer} from './www/webserver';
 import Services from './service/services';
 
 export default class HMR {
@@ -59,7 +59,11 @@ export default class HMR {
     if (!this.webServer) {
       this.webServer = new WebServer(this);
     }
-    return this._startModule(this.webServer);
+    if (!this.managementWebServer) {
+      this.managementWebServer = new ManagementWebServer(this);
+    }
+    return this._startModule(this.webServer)
+      .then(() => this._startModule(this.managementWebServer))
   }
 
   _startServices() {
@@ -77,7 +81,8 @@ export default class HMR {
   }
 
   _stopWebServer() {
-    return this._stopModule(this.webServer);
+    return this._stopModule(this.webServer)
+      .then(() => this._stopModule(this.managementWebServer))
   }
 
   _stopServices() {
@@ -97,6 +102,10 @@ export default class HMR {
 
   getWebServer() {
     return this.webServer;
+  }
+
+  getManagementWebServer() {
+    return this.managementWebServer
   }
 
   getNodeId() {
