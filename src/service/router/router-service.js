@@ -42,10 +42,9 @@ export default class RouterService extends AbstractService {
         var hmr = this.hmr;
         var server = hmr.getWebServer().getServer();
         var handle = io(server, {
-          path: this.webSocketPath,
-          pingInterval: this.v,
-          pingTimeout: this.pingTimeout,
-          perMessageDeflate
+          allowEIO3: true,
+          maxHttpBufferSize: "100MB",
+          path: this.webSocketPath
         });
         handle.on('connect', (socket) => {
           var nodeId = uuidv4();
