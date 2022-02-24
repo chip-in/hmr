@@ -103,7 +103,7 @@ export default class ProxyPath {
     return this.backends.length === 0;
   }
 
-  select(path, msg) {
+  select(path, msg) {/*eslint-disable-line no-unused-vars*/
     return Promise.resolve()
       .then(()=>{
         var count = null;

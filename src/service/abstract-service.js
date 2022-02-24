@@ -118,7 +118,7 @@ export default class AbstractService {
       .then((msg)=>this.router.answer(msg))
   }
 
-  async getProperty(name) {
+  async getProperty(name) {/*eslint-disable-line no-unused-vars*/
     return null
   }
 }

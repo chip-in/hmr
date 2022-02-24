@@ -3,19 +3,8 @@ import io from 'socket.io';
 import uuidv4 from 'uuid/v4';
 import UAParser from 'ua-parser-js';
 import CIUtil from '../../util/ci-util';
-import zlib from 'zlib';
 
 const forceWebsocketCompression = process.env.FORCE_CNODE_WSOCKET_COMPRESSION ? true : false
-
-const perMessageDeflate = {
-  zlibDeflateOptions : {
-    level:zlib.constants.Z_BEST_SPEED,
-    chunkSize : 1 * 1024 * 1024
-  },
-  zlibInflateOptions : {
-    chunkSize : 1 * 1024 * 1024
-  }
-}
 
 export default class RouterService extends AbstractService {
   constructor(hmr) {

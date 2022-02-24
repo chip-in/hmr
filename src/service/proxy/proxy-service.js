@@ -139,11 +139,11 @@ export default class ProxyService extends AbstractService {
       accessInformation.type,
       accessInformation.path,
       accessInformation.operation))
-    .then(()=>this._convertRequestMessage(req, path))
+    .then(()=>this._convertRequestMessage(req))
     .then((msg)=>this._proxy(path, msg))
     .then((respMsg)=>{
         if (req.timedout) {
-          this.logger.warn(`response is returned but request has already timed out: request='${msg}'`)
+          this.logger.warn(`response is returned but request has already timed out: request='${path}'`)
           return;
         }
         if (respMsg.t !== "response") {
@@ -176,7 +176,7 @@ export default class ProxyService extends AbstractService {
     })
     .catch((e)=>{
       if (req.timedout) {
-        this.logger.warn(`response is returned but request has already timed out: request='${msg}'`, e)
+        this.logger.warn(`response is returned but request has already timed out: request='${path}'`, e)
         return;
       }
       this.logger.error("Failed to handle request", e)
@@ -184,7 +184,7 @@ export default class ProxyService extends AbstractService {
     })
   }
 
-  _convertRequestMessage(req, path) {
+  _convertRequestMessage(req) {
     var props = ["baseUrl", "body", "cookies",
     "headers", "hostname", "httpVersion", "httpVersionMajor",
     "httpVersionMinor", "ip", "ips", "method", "originalUrl",

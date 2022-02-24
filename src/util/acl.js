@@ -20,7 +20,7 @@ class ACLLoader {
   }
 
   start(cb) {
-    var listener = (event, filename)=>{
+    var listener = (event, filename)=>{/*eslint-disable-line no-unused-vars*/
       logger.info("ACL file has changed(eventType:" + event + ")");
       if (event === "change") {
         var now = Date.now();
@@ -45,7 +45,7 @@ class ACLLoader {
         }, this.interval);
       }
     }
-    return new Promise((res, rej)=>{
+    return new Promise((res, rej)=>{/*eslint-disable-line no-unused-vars*/
       this.cb = (acl)=>{
         //init
         cb(acl);
@@ -74,7 +74,7 @@ class ACLLoader {
             typeof val.regex === "string";
   }
   _escapeRegex(val) {
-    return val.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    return val.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
   }
   _toRegex4Dadget(val) {
     const dbPath = "/d/:database";
