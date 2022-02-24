@@ -14,6 +14,7 @@
     "cleanbuild": "npm run clean && npm run build",
     "build": "babel src -s inline -d lib/",
     "clean": "rimraf lib",
+    "lint" : "eslint src",
     "debug": "node --inspect --inspect-brk --inspect-port=9230 lib/main.js",
     "watch": "npm run clean && babel src -s inline -d lib/ -w"
   },
@@ -43,6 +44,7 @@
     "@babel/cli": "^7.15.4",
     "@babel/core": "^7.5.4",
     "@babel/preset-env": "^7.5.4",
+    "eslint": "^8.9.0",
     "rimraf": "^3.0.2"
   },
   "bin": {
