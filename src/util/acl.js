@@ -1,5 +1,7 @@
 import fs from 'fs';
 import Logger from './logger';
+import CIUtil from './ci-util';
+import url from 'url';
 
 var logger = new Logger("acl");
 
@@ -8,6 +10,9 @@ const ACL_FILE_CHECK_INTERVAL = process.env.ACL_FILE_CHECK_INTERVAL || 60 * 1000
 
 const ACL_POLICY_OPERATION_ANY = "*";
 const DISABLE_HMR_ACL = process.env.DISABLE_HMR_ACL || false;
+
+const PATH_PREFIX_OF_APP = "/a/";
+const PATH_PREFIX_OF_DADGET = "/d/";
 
 class ACLLoader {
   
@@ -270,6 +275,10 @@ class ACE {
   
 }
 
+const ACL_RESULT_PERMIT = {
+  "permit": true
+}
+
 class ACL {
     constructor(filePath, interval) {
       this.ace = [];
@@ -291,16 +300,81 @@ class ACL {
       }
     }
 
+    _resolveAccessInformationFromReq(req) {
+      var path = req.path;
+      var type = "unknown";
+      var operation = "provision";
+      if (path.indexOf(PATH_PREFIX_OF_APP)===0) {
+        type = "application";
+        path = path.substring(PATH_PREFIX_OF_APP.length-1);
+      } else if (path.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
+        type = "dadget";
+      } 
+      var subject = CIUtil.findTokenFromHeaders(req.headers);
+      switch(req.method) {
+        case "GET":
+        case "HEAD":
+        case "OPTIONS":
+         operation = "READ"; break;
+        case "POST":
+        case "PUT":
+        case "DELETE":
+          operation = "WRITE"; break;
+      }
+      return {
+        subject, path, type, operation
+      }
+    }
+
+    _resolveAccessInformationFromMsg(msg) {
+      var normalizedPath = url.parse(msg.m.path).path;
+      var type = "unknown";
+      var path = normalizedPath;
+      var operation = "provision";
+  
+      if (normalizedPath.indexOf(PATH_PREFIX_OF_APP)===0) {
+        type = "application";
+        path = normalizedPath.substring(PATH_PREFIX_OF_APP.length-1);
+      } else if (normalizedPath.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
+        type = "dadget";
+      } 
+      return {
+        subject : msg.u && msg.u.token,
+        type, path, operation
+      }
+    }
+    authorizeByMsg(msg) {
+      if (DISABLE_HMR_ACL) {
+        return ACL_RESULT_PERMIT;
+      }
+      var accessInformation = this._resolveAccessInformationFromMsg(msg);
+      return this.authorize(accessInformation.subject,
+        accessInformation.type,
+        accessInformation.path,
+        accessInformation.operation)
+    }
+
+    authorizeByReq(req) {
+      if (DISABLE_HMR_ACL) {
+        return ACL_RESULT_PERMIT;
+      }
+      var accessInformation = this._resolveAccessInformationFromReq(req);
+      return this.authorize(accessInformation.subject,
+        accessInformation.type,
+        accessInformation.path,
+        accessInformation.operation)
+    }
+
     authorize(subject, resourceType, resourcePath, operation) {
       if (DISABLE_HMR_ACL) {
-        return true;
+        return ACL_RESULT_PERMIT;
       }
-      var ret = false;
+      var ret = Object.assign({permit: false}, {subject, resourceType, resourcePath, operation});
       for (var i = 0; i < this.ace.length; i++) {
         var entry = this.ace[i];
         if (entry.matchResource(resourceType, resourcePath) && 
           entry.check(subject, operation)) {
-          ret = true;
+          ret.permit = true;
           break;
         }
       }
