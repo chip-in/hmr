@@ -296,6 +296,10 @@ class ACL {
         path = path.substring(PATH_PREFIX_OF_APP.length-1);
       } else if (path.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
         type = "dadget";
+        // READ access by POST
+        if (req.method === "POST" && path.match(/^\/d\/[^?]+\/_get$/)) {
+          operation = "READ"
+        }
         path = this._parseDadgetPath(path)
       } 
       return {
