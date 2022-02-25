@@ -12,7 +12,7 @@
   "scripts": {
     "start": "node lib/main.js",
     "cleanbuild": "npm run clean && npm run build",
-    "build": "babel src -s inline -d lib/",
+    "build": "npm run lint && babel src -s inline -d lib/",
     "clean": "rimraf lib",
     "lint" : "eslint src",
     "debug": "node --inspect --inspect-brk --inspect-port=9230 lib/main.js",
