@@ -446,6 +446,7 @@ export default class ProxyService extends AbstractService {
       this.logger.warn(`ACL error detected:${JSON.stringify(aclResult)}`)
       throw new ACLError("Operation not permitted")
     }
+    this.logger.debug(`Access is permitted by ACL:${JSON.stringify(aclResult)}`)
   }
   async getProperty(name) {
     let result = null

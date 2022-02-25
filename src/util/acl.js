@@ -13,6 +13,8 @@ const DISABLE_HMR_ACL = process.env.DISABLE_HMR_ACL || false;
 
 const PATH_PREFIX_OF_APP = "/a/";
 const PATH_PREFIX_OF_DADGET = "/d/";
+const REGEX_DADGET_PATH_DB_WITH_SUBSET = /\/d\/([^/]+)\/[^/]+\/([^/]+)\/?/
+const REGEX_DADGET_PATH_DB = /\/d\/([^/]+)\//
 
 class ACLLoader {
   
@@ -81,34 +83,8 @@ class ACLLoader {
   _escapeRegex(val) {
     return val.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
   }
-  _toRegex4Dadget(val) {
-    const dbPath = "/d/:database";
-    const subsetPath = dbPath + "/(context|((subset|updator)/:subset))"
-    var parts = [];
-    if (this._isRegExpObj(val)) {
-      parts = val.regex.split("/")
-        .filter(v=>v.length>0)
-        .map(v=>"("+ v +")")
-    } else if (typeof val === "string") {
-      parts = val.split("/")
-              .filter(v=>v.length>0)
-              .map(v=>this._escapeRegex(v))
-    }
-    var regexStr = "";  
-    switch(parts.length) {
-      case 1:
-        regexStr = dbPath.replace(":database", parts[0]); break;
-      case 2:
-        regexStr = subsetPath.replace(":database", parts[0])
-                      .replace(":subset", parts[1]); break;
-    }
-    return new RegExp(regexStr);
-  }
   
-  _toRegex(val, resType) {
-    if ("dadget" === resType) {
-      return this._toRegex4Dadget(val);
-    }
+  _toRegex(val) {
     if (this._isRegExpObj(val)) {
       return new RegExp(val.regex);
     } else if (typeof val === "string") {
@@ -128,7 +104,7 @@ class ACLLoader {
       var resType = res.type;
       var resPath = null;
       if (res.path != null) {
-        resPath = this._toRegex(res.path, resType);
+        resPath = this._toRegex(res.path);
         if (resPath == null) {
           logger.warn("ACL format error. Type of 'path' value must be a string or an object which contains 'regex' property")
           return ;
@@ -244,7 +220,7 @@ class ACE {
           case "READ":
           opPermit = operation === "READ"; break;
           case "WRITE":
-          opPermit = operation === "READ" || operation === "WRITE"; break;
+          opPermit = operation === "WRITE"; break;
           default:
           logger.warn("Unknown operation (" + policy.operation + ") was found in acl. We deny it.");
           opPermit = false; break;
@@ -301,26 +277,27 @@ class ACL {
     }
 
     _resolveAccessInformationFromReq(req) {
-      var path = req.path;
-      var type = "unknown";
-      var operation = "provision";
-      if (path.indexOf(PATH_PREFIX_OF_APP)===0) {
-        type = "application";
-        path = path.substring(PATH_PREFIX_OF_APP.length-1);
-      } else if (path.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
-        type = "dadget";
-      } 
       var subject = CIUtil.findTokenFromHeaders(req.headers);
+      var operation = "provision";
       switch(req.method) {
         case "GET":
         case "HEAD":
         case "OPTIONS":
-         operation = "READ"; break;
+          operation = "READ"; break;
         case "POST":
         case "PUT":
         case "DELETE":
           operation = "WRITE"; break;
       }
+      var path = req.path;
+      var type = "unknown";
+      if (path.indexOf(PATH_PREFIX_OF_APP)===0) {
+        type = "application";
+        path = path.substring(PATH_PREFIX_OF_APP.length-1);
+      } else if (path.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
+        type = "dadget";
+        path = this._parseDadgetPath(path)
+      } 
       return {
         subject, path, type, operation
       }
@@ -337,12 +314,25 @@ class ACL {
         path = normalizedPath.substring(PATH_PREFIX_OF_APP.length-1);
       } else if (normalizedPath.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
         type = "dadget";
+        path = this._parseDadgetPath(path)
       } 
       return {
         subject : msg.u && msg.u.token,
         type, path, operation
       }
     }
+
+    _parseDadgetPath(path) {
+      let result = path
+      let regexResult = null
+      if ((regexResult = REGEX_DADGET_PATH_DB_WITH_SUBSET.exec(path))) {
+        result = `/${regexResult[1]}/${regexResult[2]}`
+      } else if ((regexResult = REGEX_DADGET_PATH_DB.exec(path))) {
+        result = `/${regexResult[1]}`
+      }
+      return result
+    }
+
     authorizeByMsg(msg) {
       if (DISABLE_HMR_ACL) {
         return ACL_RESULT_PERMIT;
@@ -375,6 +365,7 @@ class ACL {
         if (entry.matchResource(resourceType, resourcePath) && 
           entry.check(subject, operation)) {
           ret.permit = true;
+          ret.rule = entry.name
           break;
         }
       }
