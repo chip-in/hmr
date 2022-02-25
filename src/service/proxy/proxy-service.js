@@ -4,7 +4,7 @@ import url from 'url';
 import DirectoryService from './directory-service';
 import ProxyPath from './proxy-path';
 import ProxyBackend from './proxy-backend';
-import ACL from '../../util/acl';
+import {ACL} from '../../util/acl';
 import contentType from 'content-type';
 
 

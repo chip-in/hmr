@@ -15,6 +15,7 @@ const PATH_PREFIX_OF_APP = "/a/";
 const PATH_PREFIX_OF_DADGET = "/d/";
 const REGEX_DADGET_PATH_DB_WITH_SUBSET = /\/d\/([^/]+)\/[^/]+\/([^/]+)\/?/
 const REGEX_DADGET_PATH_DB = /\/d\/([^/]+)\//
+const REGEX_DADGET_ACL_PATH = /([^/]+)(?:\/([^/]+))?/
 
 class ACLLoader {
   
@@ -84,11 +85,24 @@ class ACLLoader {
     return val.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
   }
   
-  _toRegex(val) {
+  _toRegex(val, resType) {
     if (this._isRegExpObj(val)) {
       return new RegExp(val.regex);
     } else if (typeof val === "string") {
-      return new RegExp("^" + this._escapeRegex(val) + "$")
+      if (resType === "dadget") {
+        let parsedDadgetPath = REGEX_DADGET_ACL_PATH.exec(val)
+        if (parsedDadgetPath) {
+          if (parsedDadgetPath[2]) {
+            return new RegExp(`^/${this._escapeRegex(parsedDadgetPath[1])}/${this._escapeRegex(parsedDadgetPath[2])}$`)
+          } else {
+            return new RegExp(`^/${this._escapeRegex(parsedDadgetPath[1])}/.*$`)
+          }
+        } else {
+          return new RegExp("^" + this._escapeRegex(val) + "$")
+        }
+      } else {
+        return new RegExp("^" + this._escapeRegex(val) + "$")
+      }
     }
   }
 
@@ -104,7 +118,7 @@ class ACLLoader {
       var resType = res.type;
       var resPath = null;
       if (res.path != null) {
-        resPath = this._toRegex(res.path);
+        resPath = this._toRegex(res.path, resType);
         if (resPath == null) {
           logger.warn("ACL format error. Type of 'path' value must be a string or an object which contains 'regex' property")
           return ;
@@ -265,7 +279,7 @@ class ACL {
     async initialize() {
       var loader = new ACLLoader(this.filePath, this.interval);
       await loader.start((latest) => {
-        this.ace = latest;
+        this.setACE(latest);
       });
       this.loader = loader;
     }
@@ -274,6 +288,10 @@ class ACL {
       if (this.loader) {
         this.loader.stop();
       }
+    }
+
+    setACE(ace) {
+      this.ace = ace
     }
 
     _resolveAccessInformationFromReq(req) {
@@ -376,4 +394,4 @@ class ACL {
       return ret;
     }
 }
-export default ACL;
+export {ACE, ACL, ACLLoader};
