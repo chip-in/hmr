@@ -1,6 +1,7 @@
 import util from 'util';
 
 var pmap = {
+  "TRACE" : 5,
   "DEBUG" : 10,
   "INFO" : 20,
   "WARN" : 30,
@@ -31,6 +32,11 @@ class Logger {
     return p >= priority;
   }
   
+  trace() {
+    var level = "TRACE";
+    if(this._isEnabled(level)) logging.apply(null, [level, this.category].concat(Array.prototype.slice.call(arguments)));
+  }
+
   debug() {
     var level = "DEBUG";
     if(this._isEnabled(level)) logging.apply(null, [level, this.category].concat(Array.prototype.slice.call(arguments)));
