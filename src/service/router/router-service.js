@@ -6,6 +6,12 @@ import CIUtil from '../../util/ci-util';
 
 const forceWebsocketCompression = process.env.FORCE_CNODE_WSOCKET_COMPRESSION ? true : false
 
+let websocketMaxHttpBufferSizeDefault = 104857600
+let websocketMaxHttpBufferSize = parseInt(process.env.CNODE_WSOCKET_MAX_PAYLOAD || String(websocketMaxHttpBufferSizeDefault))
+if (Number.isNaN(websocketMaxHttpBufferSize)) {
+  websocketMaxHttpBufferSize = websocketMaxHttpBufferSizeDefault
+}
+
 export default class RouterService extends AbstractService {
   constructor(hmr) {
     super(hmr);
@@ -32,7 +38,7 @@ export default class RouterService extends AbstractService {
         var server = hmr.getWebServer().getServer();
         var handle = io(server, {
           allowEIO3: true,
-          maxHttpBufferSize: "100MB",
+          maxHttpBufferSize: websocketMaxHttpBufferSize,
           path: this.webSocketPath
         });
         handle.on('connect', (socket) => {
