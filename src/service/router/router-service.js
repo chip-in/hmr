@@ -3,18 +3,13 @@ import io from 'socket.io';
 import uuidv4 from 'uuid/v4';
 import UAParser from 'ua-parser-js';
 import CIUtil from '../../util/ci-util';
-import zlib from 'zlib';
 
 const forceWebsocketCompression = process.env.FORCE_CNODE_WSOCKET_COMPRESSION ? true : false
 
-const perMessageDeflate = {
-  zlibDeflateOptions : {
-    level:zlib.constants.Z_BEST_SPEED,
-    chunkSize : 1 * 1024 * 1024
-  },
-  zlibInflateOptions : {
-    chunkSize : 1 * 1024 * 1024
-  }
+let websocketMaxHttpBufferSizeDefault = 104857600
+let websocketMaxHttpBufferSize = parseInt(process.env.CNODE_WSOCKET_MAX_PAYLOAD || String(websocketMaxHttpBufferSizeDefault))
+if (Number.isNaN(websocketMaxHttpBufferSize)) {
+  websocketMaxHttpBufferSize = websocketMaxHttpBufferSizeDefault
 }
 
 export default class RouterService extends AbstractService {
@@ -42,10 +37,9 @@ export default class RouterService extends AbstractService {
         var hmr = this.hmr;
         var server = hmr.getWebServer().getServer();
         var handle = io(server, {
-          path: this.webSocketPath,
-          pingInterval: this.v,
-          pingTimeout: this.pingTimeout,
-          perMessageDeflate
+          allowEIO3: true,
+          maxHttpBufferSize: websocketMaxHttpBufferSize,
+          path: this.webSocketPath
         });
         handle.on('connect', (socket) => {
           var nodeId = uuidv4();

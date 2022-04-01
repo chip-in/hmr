@@ -130,7 +130,7 @@ class AbstractWebServer extends AbstractModule {
     });
 
     // error handler
-    app.use((err, req, res, next) => {
+    app.use((err, req, res, next) => {/*eslint-disable-line no-unused-vars*/
       this.logger.error(`Error occured. res.headersSent=${res.headersSent}. req.timedout='${req.timedout}' req='${req.method.toUpperCase()} ${req.url}'`, err);
 
       if(!res.headersSent) {

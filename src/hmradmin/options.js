@@ -114,7 +114,7 @@ const parseServiceArgv = (argv) => {
   }
 }
 
-export default function parseArgv(args){
+export default function parseArgv(args){ /*eslint-disable-line no-unused-vars*/
   const mainDefinitions = [
     { name: "command", defaultOption: true },
   ];

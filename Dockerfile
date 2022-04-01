@@ -5,7 +5,7 @@ RUN useradd -g builder -u 111 builder
 
 ENV PATH=/usr/local/nodejs/bin:/node/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
 RUN mkdir -p /tmp/buffer/hmr
-ENV NODEJS_VERSION=v8.5.0
+ENV NODEJS_VERSION=v16.14.0
 
 RUN yum -y update \
   && yum -y install unzip wget sudo lsof openssh-clients telnet bind-utils tar tcpdump vim initscripts \

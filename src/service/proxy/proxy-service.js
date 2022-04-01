@@ -4,12 +4,9 @@ import url from 'url';
 import DirectoryService from './directory-service';
 import ProxyPath from './proxy-path';
 import ProxyBackend from './proxy-backend';
-import ACL from '../../util/acl';
-import CIUtil from '../../util/ci-util';
+import {ACL} from '../../util/acl';
 import contentType from 'content-type';
 
-const PATH_PREFIX_OF_APP = "/a/";
-const PATH_PREFIX_OF_DADGET = "/d/";
 
 const MIME_TYPES_TO_STRINGIFY = ["application/json","text/xml",]
 .reduce((dst,v)=>{dst[v]=true; return dst},{})
@@ -133,17 +130,14 @@ export default class ProxyService extends AbstractService {
 
   _requestFromHTTP(req, res) {
     var path = req.path;
-    var accessInformation = this._resolveAccessInformationFromReq(req);
     return Promise.resolve()
-    .then(()=>this._authorize(accessInformation.subject,
-      accessInformation.type,
-      accessInformation.path,
-      accessInformation.operation))
-    .then(()=>this._convertRequestMessage(req, path))
+    .then(()=>this.acl.authorizeByReq(req))
+    .then((aclResult) => this._handleAclResult(aclResult))
+    .then(()=>this._convertRequestMessage(req))
     .then((msg)=>this._proxy(path, msg))
     .then((respMsg)=>{
         if (req.timedout) {
-          this.logger.warn(`response is returned but request has already timed out: request='${msg}'`)
+          this.logger.warn(`response is returned but request has already timed out: request='${path}'`)
           return;
         }
         if (respMsg.t !== "response") {
@@ -176,7 +170,7 @@ export default class ProxyService extends AbstractService {
     })
     .catch((e)=>{
       if (req.timedout) {
-        this.logger.warn(`response is returned but request has already timed out: request='${msg}'`, e)
+        this.logger.warn(`response is returned but request has already timed out: request='${path}'`, e)
         return;
       }
       this.logger.error("Failed to handle request", e)
@@ -184,7 +178,7 @@ export default class ProxyService extends AbstractService {
     })
   }
 
-  _convertRequestMessage(req, path) {
+  _convertRequestMessage(req) {
     var props = ["baseUrl", "body", "cookies",
     "headers", "hostname", "httpVersion", "httpVersionMajor",
     "httpVersionMinor", "ip", "ips", "method", "originalUrl",
@@ -367,60 +361,16 @@ export default class ProxyService extends AbstractService {
       return entry;
     })
   }
-  _resolveAccessInformationFromMsg(msg) {
-    var normalizedPath = url.parse(msg.m.path).path;
-    var type = "unknown";
-    var path = normalizedPath;
-    var operation = "provision";
-
-    if (normalizedPath.indexOf(PATH_PREFIX_OF_APP)===0) {
-      type = "application";
-      path = normalizedPath.substring(PATH_PREFIX_OF_APP.length-1);
-    } else if (normalizedPath.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
-      type = "dadget";
-    } 
-    return {
-      subject : msg.u && msg.u.token,
-      type, path, operation
-    }
-  }
-  _resolveAccessInformationFromReq(req) {
-    var path = req.path;
-    var type = "unknown";
-    var operation = "provision";
-    if (path.indexOf(PATH_PREFIX_OF_APP)===0) {
-      type = "application";
-      path = path.substring(PATH_PREFIX_OF_APP.length-1);
-    } else if (path.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
-      type = "dadget";
-    } 
-    var subject = CIUtil.findTokenFromHeaders(req.headers);
-    switch(req.method) {
-      case "GET":
-      case "HEAD":
-      case "OPTIONS":
-       operation = "READ"; break;
-      case "POST":
-      case "PUT":
-      case "DELETE":
-        operation = "WRITE"; break;
-    }
-    return {
-      subject, path, type, operation
-    }
-  }
   _mount(msg) {
     var instanceId = uuidv4();
     var addRequest = this._createAddServiceRequestMessage(msg, instanceId);
     var normalizedPath = url.parse(msg.m.path).path;
-    var accessInformation = this._resolveAccessInformationFromMsg(msg);
     return Promise.resolve()
       .then(()=>{
         if(!msg.r.inprocess) {
-          return this._authorize(accessInformation.subject,
-            accessInformation.type,
-            accessInformation.path,
-            accessInformation.operation)
+          return Promise.resolve()
+          .then(()=>this.acl.authorizeByMsg(msg))
+          .then((aclResult) => this._handleAclResult(aclResult))
         }
       })
       .then(()=>this._findClusterService())
@@ -491,14 +441,12 @@ export default class ProxyService extends AbstractService {
         }
       })
   } 
-  _authorize(subject, resourceType, resourcePath, operation) {
-    return Promise.resolve()
-      .then(()=>{
-        if (!this.acl.authorize(subject, resourceType, resourcePath, operation)) {
-          this.logger.warn("ACL error detected:", {subject, resourceType, resourcePath, operation})
-          throw new ACLError("Operation not permitted")
-        }
-      })
+  _handleAclResult(aclResult) {
+    if (!aclResult.permit) {
+      this.logger.warn(`ACL error detected:${JSON.stringify(aclResult)}`)
+      throw new ACLError("Operation not permitted")
+    }
+    if (this.logger._isEnabled("TRACE")) this.logger.trace(`Access is permitted by ACL:${JSON.stringify(aclResult)}`)
   }
   async getProperty(name) {
     let result = null

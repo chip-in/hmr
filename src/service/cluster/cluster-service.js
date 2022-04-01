@@ -1,7 +1,5 @@
 import AbstractService from '../abstract-service';
-import io from 'socket.io';
 import ServiceRegistry from './registry/service-registry';
-import uuidv4 from 'uuid/v4'
 
 export default class ClusterService extends AbstractService {
 

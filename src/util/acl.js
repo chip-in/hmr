@@ -1,5 +1,7 @@
 import fs from 'fs';
 import Logger from './logger';
+import CIUtil from './ci-util';
+import url from 'url';
 
 var logger = new Logger("acl");
 
@@ -8,6 +10,12 @@ const ACL_FILE_CHECK_INTERVAL = process.env.ACL_FILE_CHECK_INTERVAL || 60 * 1000
 
 const ACL_POLICY_OPERATION_ANY = "*";
 const DISABLE_HMR_ACL = process.env.DISABLE_HMR_ACL || false;
+
+const PATH_PREFIX_OF_APP = "/a/";
+const PATH_PREFIX_OF_DADGET = "/d/";
+const REGEX_DADGET_PATH_DB_WITH_SUBSET = /\/d\/([^/]+)\/[^/]+\/([^/]+)\/?/
+const REGEX_DADGET_PATH_DB = /\/d\/([^/]+)\//
+const REGEX_DADGET_ACL_PATH = /([^/]+)(?:\/([^/]+))?/
 
 class ACLLoader {
   
@@ -20,7 +28,7 @@ class ACLLoader {
   }
 
   start(cb) {
-    var listener = (event, filename)=>{
+    var listener = (event, filename)=>{/*eslint-disable-line no-unused-vars*/
       logger.info("ACL file has changed(eventType:" + event + ")");
       if (event === "change") {
         var now = Date.now();
@@ -45,7 +53,7 @@ class ACLLoader {
         }, this.interval);
       }
     }
-    return new Promise((res, rej)=>{
+    return new Promise((res, rej)=>{/*eslint-disable-line no-unused-vars*/
       this.cb = (acl)=>{
         //init
         cb(acl);
@@ -74,40 +82,27 @@ class ACLLoader {
             typeof val.regex === "string";
   }
   _escapeRegex(val) {
-    return val.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-  }
-  _toRegex4Dadget(val) {
-    const dbPath = "/d/:database";
-    const subsetPath = dbPath + "/(context|((subset|updator)/:subset))"
-    var parts = [];
-    if (this._isRegExpObj(val)) {
-      parts = val.regex.split("/")
-        .filter(v=>v.length>0)
-        .map(v=>"("+ v +")")
-    } else if (typeof val === "string") {
-      parts = val.split("/")
-              .filter(v=>v.length>0)
-              .map(v=>this._escapeRegex(v))
-    }
-    var regexStr = "";  
-    switch(parts.length) {
-      case 1:
-        regexStr = dbPath.replace(":database", parts[0]); break;
-      case 2:
-        regexStr = subsetPath.replace(":database", parts[0])
-                      .replace(":subset", parts[1]); break;
-    }
-    return new RegExp(regexStr);
+    return val.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
   }
   
   _toRegex(val, resType) {
-    if ("dadget" === resType) {
-      return this._toRegex4Dadget(val);
-    }
     if (this._isRegExpObj(val)) {
       return new RegExp(val.regex);
     } else if (typeof val === "string") {
-      return new RegExp("^" + this._escapeRegex(val) + "$")
+      if (resType === "dadget") {
+        let parsedDadgetPath = REGEX_DADGET_ACL_PATH.exec(val)
+        if (parsedDadgetPath) {
+          if (parsedDadgetPath[2]) {
+            return new RegExp(`^/${this._escapeRegex(parsedDadgetPath[1])}/${this._escapeRegex(parsedDadgetPath[2])}$`)
+          } else {
+            return new RegExp(`^/${this._escapeRegex(parsedDadgetPath[1])}/.*$`)
+          }
+        } else {
+          return new RegExp("^" + this._escapeRegex(val) + "$")
+        }
+      } else {
+        return new RegExp("^" + this._escapeRegex(val) + "$")
+      }
     }
   }
 
@@ -239,7 +234,7 @@ class ACE {
           case "READ":
           opPermit = operation === "READ"; break;
           case "WRITE":
-          opPermit = operation === "READ" || operation === "WRITE"; break;
+          opPermit = operation === "WRITE"; break;
           default:
           logger.warn("Unknown operation (" + policy.operation + ") was found in acl. We deny it.");
           opPermit = false; break;
@@ -270,6 +265,10 @@ class ACE {
   
 }
 
+const ACL_RESULT_PERMIT = {
+  "permit": true
+}
+
 class ACL {
     constructor(filePath, interval) {
       this.ace = [];
@@ -280,7 +279,7 @@ class ACL {
     async initialize() {
       var loader = new ACLLoader(this.filePath, this.interval);
       await loader.start((latest) => {
-        this.ace = latest;
+        this.setACE(latest);
       });
       this.loader = loader;
     }
@@ -291,20 +290,108 @@ class ACL {
       }
     }
 
+    setACE(ace) {
+      this.ace = ace
+    }
+
+    _resolveAccessInformationFromReq(req) {
+      var subject = CIUtil.findTokenFromHeaders(req.headers);
+      var operation = "provision";
+      switch(req.method) {
+        case "GET":
+        case "HEAD":
+        case "OPTIONS":
+          operation = "READ"; break;
+        case "POST":
+        case "PUT":
+        case "DELETE":
+          operation = "WRITE"; break;
+      }
+      var path = req.path;
+      var type = "unknown";
+      if (path.indexOf(PATH_PREFIX_OF_APP)===0) {
+        type = "application";
+        path = path.substring(PATH_PREFIX_OF_APP.length-1);
+      } else if (path.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
+        type = "dadget";
+        // READ access by POST
+        if (req.method === "POST" && path.match(/^\/d\/[^?]+\/_get$/)) {
+          operation = "READ"
+        }
+        path = this._parseDadgetPath(path)
+      } 
+      return {
+        subject, path, type, operation
+      }
+    }
+
+    _resolveAccessInformationFromMsg(msg) {
+      var normalizedPath = url.parse(msg.m.path).path;
+      var type = "unknown";
+      var path = normalizedPath;
+      var operation = "provision";
+  
+      if (normalizedPath.indexOf(PATH_PREFIX_OF_APP)===0) {
+        type = "application";
+        path = normalizedPath.substring(PATH_PREFIX_OF_APP.length-1);
+      } else if (normalizedPath.indexOf(PATH_PREFIX_OF_DADGET) === 0) {
+        type = "dadget";
+        path = this._parseDadgetPath(path)
+      } 
+      return {
+        subject : msg.u && msg.u.token,
+        type, path, operation
+      }
+    }
+
+    _parseDadgetPath(path) {
+      let result = path
+      let regexResult = null
+      if ((regexResult = REGEX_DADGET_PATH_DB_WITH_SUBSET.exec(path))) {
+        result = `/${regexResult[1]}/${regexResult[2]}`
+      } else if ((regexResult = REGEX_DADGET_PATH_DB.exec(path))) {
+        result = `/${regexResult[1]}`
+      }
+      return result
+    }
+
+    authorizeByMsg(msg) {
+      if (DISABLE_HMR_ACL) {
+        return ACL_RESULT_PERMIT;
+      }
+      var accessInformation = this._resolveAccessInformationFromMsg(msg);
+      return this.authorize(accessInformation.subject,
+        accessInformation.type,
+        accessInformation.path,
+        accessInformation.operation)
+    }
+
+    authorizeByReq(req) {
+      if (DISABLE_HMR_ACL) {
+        return ACL_RESULT_PERMIT;
+      }
+      var accessInformation = this._resolveAccessInformationFromReq(req);
+      return this.authorize(accessInformation.subject,
+        accessInformation.type,
+        accessInformation.path,
+        accessInformation.operation)
+    }
+
     authorize(subject, resourceType, resourcePath, operation) {
       if (DISABLE_HMR_ACL) {
-        return true;
+        return ACL_RESULT_PERMIT;
       }
-      var ret = false;
+      var ret = Object.assign({permit: false}, {subject, resourceType, resourcePath, operation});
       for (var i = 0; i < this.ace.length; i++) {
         var entry = this.ace[i];
         if (entry.matchResource(resourceType, resourcePath) && 
           entry.check(subject, operation)) {
-          ret = true;
+          ret.permit = true;
+          ret.rule = entry.name
           break;
         }
       }
       return ret;
     }
 }
-export default ACL;
+export {ACE, ACL, ACLLoader};

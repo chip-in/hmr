@@ -1,5 +1,15 @@
 import util from 'util';
 
+var pmap = {
+  "TRACE" : 5,
+  "DEBUG" : 10,
+  "INFO" : 20,
+  "WARN" : 30,
+  "ERROR" : 40
+}
+
+var priority = pmap[process.env.CNODE_LOG_LEVEL] || pmap["DEBUG"];
+
 var logging = function() {
   var msgs = [new Date().toISOString()
     ,(arguments[0] + "   ").substr(0, 5)
@@ -9,30 +19,43 @@ var logging = function() {
   console.log(msgs.join(" "));
 }
 
-export default class Logger {
+/**
+ * @desc  ロガークラス
+ */
+class Logger {
   constructor(category) {
     this.category = category || "";
   }
   
+  _isEnabled(level) {
+    var p = pmap[level] || 0;
+    return p >= priority;
+  }
+  
+  trace() {
+    var level = "TRACE";
+    if(this._isEnabled(level)) logging.apply(null, [level, this.category].concat(Array.prototype.slice.call(arguments)));
+  }
+
   debug() {
-    logging.apply(null, ["DEBUG", this.category].concat(Array.prototype.slice.call(arguments)));
+    var level = "DEBUG";
+    if(this._isEnabled(level)) logging.apply(null, [level, this.category].concat(Array.prototype.slice.call(arguments)));
   }
 
   info() {
-    logging.apply(null, ["INFO", this.category].concat(Array.prototype.slice.call(arguments)));
+    var level = "INFO";
+    if(this._isEnabled(level)) logging.apply(null, [level, this.category].concat(Array.prototype.slice.call(arguments)));
   }
 
   warn() {
-    logging.apply(null, ["WARN", this.category].concat(Array.prototype.slice.call(arguments)));
+    var level = "WARN";
+    if(this._isEnabled(level)) logging.apply(null, [level, this.category].concat(Array.prototype.slice.call(arguments)));
   }
 
   error() {
-    logging.apply(null, ["ERROR", this.category].concat(Array.prototype.slice.call(arguments)));
+    var level = "ERROR";
+    if(this._isEnabled(level)) logging.apply(null, [level, this.category].concat(Array.prototype.slice.call(arguments)));
   }
 
-  crit() {
-    logging.apply(null, ["CRIT", this.category].concat(Array.prototype.slice.call(arguments)));
-  }
-
-  
 }
+export default Logger
