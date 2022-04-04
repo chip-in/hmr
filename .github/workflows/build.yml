@@ -38,4 +38,5 @@ jobs:
           artifacts: hmr-rpm.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: "${{ env.VERSION }}"
-          removeArtifacts: True
+          allowUpdates: true
+          replacesArtifacts: true
