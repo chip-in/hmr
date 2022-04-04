@@ -6,7 +6,7 @@ on:
     branches:
       - 'main'
 jobs:
-  build:
+  build-rpm:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -27,7 +27,7 @@ jobs:
         env:
           TRAVIS_BUILD_DIR: ${{ github.workspace }}
         run: |
-          docker build -t chipin/hmr-rpm .
+          docker build -t chipin/hmr-rpm build/rpm
           mkdir -p /tmp/RPMS/x86_64
           sudo chown 111:111 -R /tmp/RPMS
           docker run --rm --name hmr-rpm -v /tmp/RPMS:/home/builder/rpmbuild/RPMS -e VERSION=$VERSION -e RELEASE=$RELEASE chipin/hmr-rpm
