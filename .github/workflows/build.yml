@@ -32,16 +32,10 @@ jobs:
           sudo chown 111:111 -R /tmp/RPMS
           docker run --rm --name hmr-rpm -v /tmp/RPMS:/home/builder/rpmbuild/RPMS -e VERSION=$VERSION -e RELEASE=$RELEASE chipin/hmr-rpm
           (cd /tmp;tar czf - RPMS) > $TRAVIS_BUILD_DIR/hmr-rpm.tar.gz
-      - name: Remove previous binaries
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: hmr-rpm.tar.gz
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: "${{ env.VERSION }}"
-          removeArtifacts: True
       - name: Release
         uses: ncipollo/release-action@v1
         with:
           artifacts: hmr-rpm.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: "${{ env.VERSION }}"
+          removeArtifacts: True
