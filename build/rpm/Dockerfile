@@ -26,7 +26,7 @@ RUN mkdir -p ${HOME}/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
 RUN git clone https://github.com/chip-in/hmr.git ${HOME}/rpmbuild/SOURCES/hmr \
   && rm -rf ${HOME}/rpmbuild/SOURCES/hmr/.git  \
-  && cp ${HOME}/rpmbuild/SOURCES/hmr/hmr.spec ${HOME}/rpmbuild/SPECS
+  && cp ${HOME}/rpmbuild/SOURCES/hmr/build/rpm/hmr.spec ${HOME}/rpmbuild/SPECS
 
 COPY build.sh .
 CMD ["/bin/bash", "./build.sh"]
