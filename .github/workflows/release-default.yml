@@ -33,7 +33,7 @@ jobs:
           mkdir -p /tmp/RPMS/x86_64
           sudo chown 111:111 -R /tmp/RPMS
           docker run --rm --name hmr-rpm -v /tmp/RPMS:/home/builder/rpmbuild/RPMS -e VERSION=$VERSION -e RELEASE=$RELEASE chipin/hmr-rpm
-          (cd /tmp;tar czf - RPMS) > $TRAVIS_BUILD_DIR/hmr-rpm.tar.gz
+          (cd /tmp;tar czf - RPMS) > ${{ github.workspace }}/hmr-rpm.tar.gz
 
       - name: Release
         uses: ncipollo/release-action@v1
