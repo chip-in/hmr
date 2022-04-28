@@ -1,6 +1,6 @@
 {
   "name": "hmr",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "chip-in HMR(HTTP Message Router) server",
   "keywords": [
     "chip-in"
@@ -15,7 +15,7 @@
     "build": "npm run lint && babel src -s inline -d lib/",
     "clean": "rimraf lib",
     "lint": "eslint src",
-    "test" : "mocha",
+    "test": "mocha",
     "debug": "node --inspect --inspect-brk --inspect-port=9230 lib/main.js",
     "watch": "npm run clean && babel src -s inline -d lib/ -w"
   },
