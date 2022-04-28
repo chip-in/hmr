@@ -27,5 +27,4 @@ COPY . ${HOME}/rpmbuild/SOURCES/hmr
 COPY build/rpm/build.sh .
 COPY build/rpm/hmr.spec ${HOME}/rpmbuild/SPECS
 
-COPY build.sh .
 CMD ["/bin/bash", "./build.sh"]
