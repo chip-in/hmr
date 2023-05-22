@@ -16,8 +16,8 @@ export default class RouterService extends AbstractService {
   constructor(hmr) {
     super(hmr);
     this.webSocketPath = process.env.CNODE_WSOCKET_PATH || '/r';
-    this.pingInterval =  process.env.CNODE_WSOCKET_PING_INTERVAL ? Number(process.env.CNODE_WSOCKET_PING_INTERVAL) : 10000;
-    this.pingTimeout = process.env.CNODE_WSOCKET_PING_TIMEOUT ? Number(process.env.CNODE_WSOCKET_PING_TIMEOUT) : 30000;
+    this.pingInterval =  process.env.CNODE_WSOCKET_PING_INTERVAL ? Number(process.env.CNODE_WSOCKET_PING_INTERVAL) : 25000;
+    this.pingTimeout = process.env.CNODE_WSOCKET_PING_TIMEOUT ? Number(process.env.CNODE_WSOCKET_PING_TIMEOUT) : 45000;
     this.webSocketMsgName = process.env.CNODE_WSOCKET_MSG_NAME || 'ci-msg';
 
     this.socketMap = {};
@@ -39,7 +39,9 @@ export default class RouterService extends AbstractService {
         var handle = io(server, {
           allowEIO3: true,
           maxHttpBufferSize: websocketMaxHttpBufferSize,
-          path: this.webSocketPath
+          path: this.webSocketPath,
+          pingInterval: this.pingInterval,
+          pingTimeout: this.pingTimeout
         });
         handle.on('connect', (socket) => {
           var nodeId = uuidv4();
